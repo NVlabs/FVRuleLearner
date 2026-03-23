@@ -1,0 +1,1361 @@
+Jasper Apps 2023.12 FCS 64 bits 2023.12.19 17:39:24 UTC
+
+Any disclosure about the Cadence Design Systems software or its use
+model to any third party violates the written Non-Disclosure Agreement
+between Cadence Design Systems, Inc. and the customer.
+
+THIS SOFTWARE CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF
+CADENCE DESIGN SYSTEMS, INC. USE, DISCLOSURE, OR REPRODUCTION IS
+PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF CADENCE
+DESIGN SYSTEMS, INC.
+
+Copyright (C) 2000-2023 Cadence Design Systems, Inc. All Rights
+Reserved.  Unpublished -- rights reserved under the copyright laws of
+the United States.
+
+This product includes software developed by others and redistributed
+according to license agreement. See doc/third_party_readme.txt for
+further details.
+
+RESTRICTED RIGHTS LEGEND
+
+Use, duplication, or disclosure by the Government is subject to
+restrictions as set forth in subparagraph (c) (1) (ii) of the Rights in
+Technical Data and Computer Software clause at DFARS 252.227-7013 or
+subparagraphs (c) (1) and (2) of Commercial Computer Software -- Restricted
+Rights at 48 CFR 52.227-19, as applicable.
+
+
+                          Cadence Design Systems, Inc.
+                          2655 Seely Avenue
+                          San Jose, CA 95134
+                          Phone: 408.943.1234
+
+For technical assistance visit http://support.cadence.com.
+
+Jasper Apps Analysis Session - /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/jg/sessionLogs/session_0
+
+WARNING (WG017): [session]: The system's locale is "ANSI_X3.4-1968", which is not UTF-8. Non-ASCII characters might not be handled correctly.
+WARNING (WG017): [jg_console]: The system's locale is "ANSI_X3.4-1968", which is not UTF-8. Non-ASCII characters might not be handled correctly.
+INFO: successfully checked out license "jasper_fao".
+INFO: reading configuration file "/home/liwan/.config/cadence/jasper.conf".
+% session -refresh
+%% set EXP_ID design2sva_assertionbench
+design2sva_assertionbench
+%% set TASK_ID rxLinkFaultState
+rxLinkFaultState
+%% set SV_DIR /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0
+/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0
+%% set CLK rxclk
+rxclk
+%% set RST reset
+reset
+%% set TB_MODULE i_rxLinkFaultState
+i_rxLinkFaultState
+%% set TOP rxLinkFaultState
+rxLinkFaultState
+% # Analyze property files 
+% clear -all 
+INFO (IPF121): Cleared environment completely for new design analysis.
+% 
+% # Initialize coverage for both stimuli models and COI 
+% check_cov -init -model all -type all -exclude_module {TB_MODULE}
+INFO (ICD011): Message "VERI-9104" has been changed from "error" to "warning" level.
+true
+% 
+% analyze -clear 
+% analyze -sv12 ${SV_DIR}/${EXP_ID}_${TASK_ID}.sv 
+[-- (VERI-1482)] Analyzing Verilog file '/home/tools/tempusquest/jasper_2023.12/lib/verilog/packages/std/std.sv' into library 'std'
+[-- (VERI-1482)] Analyzing Verilog file '/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv'
+% analyze -sv12 ${SV_DIR}/${EXP_ID}_${TASK_ID}.sva 
+[-- (VERI-1482)] Analyzing Verilog file '/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva'
+% 
+% # Elaborate design and properties 
+% elaborate -top ${TOP}
+INFO (ISW003): Top module name is "rxLinkFaultState".
+[INFO (HIER-8002)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv(194): Disabling old hierarchical reference handler
+[INFO (VERI-1018)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva(1): compiling module 'i_rxLinkFaultState'
+[INFO (VERI-1018)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv(87): compiling module 'rxLinkFaultState'
+[WARN (VERI-1209)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv(114): expression size 2 truncated to fit in target size 1
+[WARN (VERI-1209)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv(150): expression size 32 truncated to fit in target size 1
+[WARN (VERI-1209)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv(191): expression size 32 truncated to fit in target size 6
+[WARN (VDB-1002)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv(104): net 'linkstate_next[2]' does not have a driver
+[WARN (VDB-1002)] /home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv(111): net 'seq_cnt_3' does not have a driver
+INFO (INL208): Elaboration synthesis summary:
+  Number of synthesized netlists          3 (1 packages)
+  Single run mode                         On
+  Pipeline                                On (2 pipelined netlists)
+  Late hierarchical reference connection  On
+  Number of analyzed Verilog modules      3 (3 synthesized)
+  Number of analyzed VHDL entities        0 (0 synthesized)
+INFO (INL003): Clearing all state information (assumes, stopats, and so forth).
+INFO (ICOV005): Invoking auto-setup: Creating a coverage model with the following parameters:
+    model = Branch Functional Expression Toggle Statement
+    include_x_cover_items = False
+    exclude_empty_branch_cover_items = False
+    exclude_cover_expression_calculation = False
+    enable_proof_core = True
+    skip_ternary_branches = False
+    type = all
+    regexp = False
+    toggle_mutation_type = StopAt
+    statement_type_blocking = Falsestatement_type_non_blocking = False
+WARNING (WCOV007): No matching Modules found in the design for check_cov -init switch '-exclude_module' argument : 'TB_MODULE'
+WARNING (WCOV007): Branch Cover items for Continuous Assignments in verilog are not generated by default. Use 'set_assign_scoring' ccf-command or '-include_assign_scoring' switch in 'check_cov -init' tcl command.
+INFO (ICOV008): Adding all assertions to the coverage database.
+INFO (ICOV009): Finished auto-setup.
+rxLinkFaultState
+[<embedded>] % 
+[<embedded>] % # Define clock and reset signals
+[<embedded>] % clock ${CLK}
+[<embedded>] % reset ${RST}
+INFO (IPM031): Clearing proof results of all properties.
+INFO (IRS006): Current reset condition is "reset".
+[<embedded>] % 
+[<embedded>] % # Get design information to check general complexity
+[<embedded>] % get_design_info
+Statistics [for instance "rxLinkFaultState"]
+---------------------------
+# Flops:         7 (17) (0 property flop bits)
+# Latches:       0 (0)
+# Gates:         509 (911)
+# Nets:          555
+# Ports:         5
+# RTL Lines:     210
+# RTL Instances: 2
+# Embedded Assumptions: 0
+# Embedded Assertions:  26
+# Embedded Covers:      26
+17
+[<embedded>] % 
+[<embedded>] % # Run proof on all assertions with a time limit 
+[<embedded>] % prove -all
+Ncustom1: Custom engine code is hT3Ng7hPPfiYQOTDZ3qhYOwGAM51eA+J/FjkM5shLioAsqhgLR4Ft+O1BuKG6ilQ83B9tLXSl+CwjiTMAQA
+Bcustom2: Custom engine code is hT3Nm7hPr1Vp3Di1Ra2USNIGL4JypRnLKLAdF6JAyuavO2JfGCiY9OZJhcAcOUnLx5xwNdhILGrAWX9s+z2WDkKwNR7tAfClBEjRFVQeq6DU54boFgEA
+AMcustom3: Custom engine code is hT3Ng7hP/feYQOTDZ3qhYOwGAM51eA+J/FjkM5shLioAsqhgLR4Ft+O1BuKG6ilQ83B9tLXSmmqwm7g9AQA
+Mpcustom4: Custom engine code is hT3NZbhP9fmY2AbBQnsjfOxn6c+6e6yL+/e8fZFmaQrnlgEA
+INFO (IPF036): Starting proof on task: "<embedded>", 52 properties to prove with 0 already proven/unreachable
+INFO (IRS029): Starting reset analysis: phase 1 of 4.
+INFO (IRS030): Running reset analysis: phase 2 of 4.
+INFO (IRS031): Running reset analysis: phase 3 of 4.
+INFO (IRS020): Starting the reset analysis simulation with a limit of 100 iterations (phase 4 of 4).
+INFO (IRS024): Reset iterations 0 to 4 analyzed.
+INFO (IRS018): Reset analysis simulation executed for 3 iterations. Assigned values for 17 of 17 design flops, 0 of 0 design latches, 89 of 89 internal elements.
+INFO (IRS039): Reset analysis complete.
+INFO (IPF031): Settings used for proof thread 0:
+    orchestration                 = on (auto)
+    time_limit                    = 86400s
+    per_property_time_limit       = 1s * 10 ^ scan
+    engine_mode                   = auto
+    proofgrid_per_engine_max_jobs = 1
+    max engine jobs               = auto
+    proofgrid_mode                = local
+    proofgrid_restarts            = 10
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_1" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_1:precondition1" was proven unreachable in 0.00 s.
+AMcustom5: Custom engine code is hT3N1rhP11/52HrFRS21ROp2LOjVTgPvT8L8BGXHgLhaIuqtT4nARFjUqrBL+7pLmaTOzBepZW/Jm8SSrHDybSQtoNiO3y43wk+dEoWlsZizu97Fih6O6lPVG/LpWP5SsUPwlGagLNa1FKEFvwVXyX7//8prySbvSxIHXr5er+z4RAEA
+Ncustom6: Custom engine code is hT3OXrhPByJp3TrFSTLhUmMH4KVtJgmTCnNDF46yMXOKY48m4LS5nE7yBzFjA7kDuwO/GhGUpEPiky3p3wmPn3dJZHxFMsafSoObRzSC+tn7sEY0WbTdZ/FV4hL3MYH/b1CIUvXSWR4wqEoVLsmMOD4xIPT4lI1LO6ZCO7PnnWQuLwetnvKlrXx6wCW/A+x+enqslg1YPobi4wEF/EvbzOvcTYdJvl2s4H2yZg2b2ofAVN5WvhWk1HoBAA
+ADcustom7: Custom engine code is hT3Nv7hPv1752HrFRa2kROx2f/ECJeZB2AZsLdlO8VwmIuqtT4nIDFXclhg+O+o+DMmQCekbheGk0kK28laA9gaOFDXsQp29J3X615HY1IPHJWd6FUFvCHjO+p1k652b5JJvZlShNpGlGSXAiQe/mEAj6tEBAA
+Tricustom8: Custom engine code is hT3Nu7hPt1752DvFRa0kNDiyIV97VyejwM9C/jCLJjdPvusZONHY42VYUy0Q1ZotnhcVtNc56tJ5wbxv6V2+XpdsaSlHck5vfnbYjdwj1OECy9U+7oSQ0SZE3g5ayD+Phuh4odCJTjeKa2k4elM9ldQfkAEA
+Gcustom9: Custom engine code is hT3NibhPDfeYQADBZnYcglOvK9Pfd7EOeniIqP8jNsyIqInncipMGcUXqAadachREE9F2PwhBUZUNw5kHnd4JdXkamORRgEA
+C2custom10: Custom engine code is hT3NirhPjfWYQADBZnYcglOvK9Pfd7EOeniIqP8jNsyIqInncgkrYMMXCYbdK0dUjZIF9d4cJ0rHoBDjwVLBKuG86XYVV00BAA
+AGcustom11: Custom engine code is hT3NirhP/fmYQADBZnYcglOvK9Pfd7EOeniIqP8jNsyIqInnckcwYMMXCYbdK0dUjZIF9d4cJ0rHoBDjwVLBKuHEZnZByh0BAA
+Bcustom12: Custom engine code is hT3NjrhPDfiYQADBZnYcglOvK9PfWxFtenjIyBqfrgr7if/jL/yPOuK1BAflEcW0DxNH2eDIoezN2gxlQFg81RZtiWXh7aiTAidvAQA
+Ncustom13: Custom engine code is hT3NR7hPByFp3TrFSTLhUmMH4KWtJglTyV/c51BHEeZWamnJv767nE6PCak26bd3gf3XGN3rIRheufhDieCJQVISo+gNYUKhiUedBKGtsP/a18svAnlMJZudHxDFwK5ufsyoxsIyiAeSY2oi3tEuoDHr5gw42DFKAG3PqO3CEsl8Azzdt3pl5nGA1Ifv2H02eYsFzWb/nfp8PMb3F0krE/EgBcm8TD9Div8BAA
+Tricustom14: Custom engine code is hT3Nu7hP3fiYQADBZnYcglNHp9bfd7EOeniIqP/ji8sGLQu8yhsFO+wxJ+O+R0bU8g/IewXFomyos+viQnWc2xYNYmMqpo3i40O7DaZR7qfp4YqNx26KRvQ/qx0BAA
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_2" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_2:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_3" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_3:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_4" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_4:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_8" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_8:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_9" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_9:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_10" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_10:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_11" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_11:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_12" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_12:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_13" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_13:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_14" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_15" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_17" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_18" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_19" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_21" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_22:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_23:precondition1" was proven unreachable in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_24" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_25" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_26" was proven in 0.00 s.
+0: Found proofs for 31 properties in preprocessing
+0: Using multistage preprocessing
+0: Starting reduce
+0: Finished reduce in 0s
+0.0.PRE: Performing Proof Simplification...
+0.0.N: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+0.0.N: Proof Simplification Iteration 1	[0.00 s]
+0.0.PRE: A trace with 1 cycles was found. [0.00 s]
+INFO (IPF047): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_5:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_7:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_14:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_17:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_19:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_24:precondition1" was covered in 1 cycles in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_5" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_6" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_7" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_16" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_20" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_22" was proven in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_23" was proven in 0.00 s.
+0.0.N: Proof Simplification Iteration 2	[0.05 s]
+0.0.N: Proof Simplification Iteration 3	[0.05 s]
+0.0.PRE: A trace with 2 cycles was found. [0.01 s]
+INFO (IPF047): 0.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_15:precondition1" was covered in 2 cycles in 0.00 s.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property ":noDeadEnd" was proven in 0.00 s.
+    Use check_assumptions -show -dead_end to show this property in the property table.
+0.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 0.0.PRE: The property ":noConflict" was proven in 0.00 s.
+    Use check_assumptions -show to show this property in the property table.
+INFO (IPF047): 0.0.PRE: The cover property ":live" was covered in 1 cycles in 0.00 s.
+    Use check_assumptions -show -live to show this property in the property table.
+0.0.PRE: Proof Simplification completed in 0.06 s
+0.0.N: Identified and disabled 9 duplicated targets.
+0: About to start ProofGrid in its own thread with a limit of 10000 pending notifications and a limit of 10 traces.
+0: =============================== ProofGrid start ===============================
+0: ProofGrid usable level: 3
+0: Initial ProofGrid level: 1
+0: ProofGrid is starting event handling
+0.0.Hp: Proofgrid shell started at 4490@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.N: Proofgrid shell started at 4489@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.Hp: OS virtual memory limit : 8589934592 / 8589934592
+0.0.Hp: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+0.0.N: OS virtual memory limit : 8589934592 / 8589934592
+0.0.Hp: Trace Attempt  1	[0.00 s]
+0.0.Hp: A trace with 1 cycles was found. [0.00 s]
+INFO (IPF047): 0.0.Hp: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_18:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.Hp: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_20:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.Hp: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_25:precondition1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 0.0.Hp: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_26:precondition1" was covered in 1 cycles in 0.00 s.
+0.0.Hp: A trace with 1 cycles was found. [0.00 s]
+INFO (IPF047): 0.0.Hp: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_21:precondition1" was covered in 1 cycles in 0.01 s.
+0.0.Hp: Trace Attempt  2	[0.00 s]
+0.0.Hp: Trace Attempt  3	[0.00 s]
+0.0.Hp: Trace Attempt  4	[0.00 s]
+0.0.Hp: Trace Attempt  5	[0.00 s]
+0: ProofGrid usable level: 1
+0.0.N: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+0.0.N: Next scan (0) will use per property time limit: 1s * 10 ^ 0 = 1s
+0.0.N: Starting proof for property "rxLinkFaultState.v_rxLinkFaultState._assert_6:precondition1"	[0.00 s].
+0.0.N: Starting proof for property "rxLinkFaultState.v_rxLinkFaultState._assert_16:precondition1"	[0.00 s].
+0.0.N: Trace Attempt  1	[0.00 s]
+0.0.N: A max_length bound was found. The shortest trace is no longer than 4096 cycles. [0.00 s]
+INFO (IPF008): 0.0.N: A max_length bound of 4096 was found for the property "rxLinkFaultState.v_rxLinkFaultState._assert_6:precondition1" in 0.00 s.
+0.0.N: A max_length bound was found. The shortest trace is no longer than 4096 cycles. [0.00 s]
+INFO (IPF008): 0.0.N: A max_length bound of 4096 was found for the property "rxLinkFaultState.v_rxLinkFaultState._assert_16:precondition1" in 0.00 s.
+0.0.N: Trace Attempt  2	[0.00 s]
+0.0.N: Trace Attempt  3	[0.00 s]
+0.0.N: Trace Attempt  3	[0.00 s]
+0.0.N: Trace Attempt  4	[0.00 s]
+0.0.N: Trace Attempt  5	[0.00 s]
+0.0.N: Trace Attempt  5	[0.00 s]
+0.0.N: Trace Attempt  1	[0.00 s]
+0.0.N: Trace Attempt  2	[0.00 s]
+0.0.N: Trace Attempt  3	[0.00 s]
+0.0.N: Trace Attempt  5	[0.00 s]
+0.0.N: Trace Attempt  1	[0.01 s]
+0.0.N: Trace Attempt  2	[0.01 s]
+0.0.N: Trace Attempt  3	[0.01 s]
+0.0.N: Trace Attempt  5	[0.01 s]
+0.0.N: Requesting engine job to stop
+0.0.Hp: Requesting engine job to terminate
+INFO (IPF144): 0: Initiating shutdown of proof [0.02 s]
+0.0.Hp: Trace Attempt 66	[0.01 s]
+0.0.Hp: A trace with 66 cycles was found. [0.01 s]
+INFO (IPF047): 0.0.Hp: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_6:precondition1" was covered in 66 cycles in 0.02 s.
+INFO (IPF047): 0.0.Hp: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_16:precondition1" was covered in 66 cycles in 0.02 s.
+0.0.Hp: All properties determined. [0.01 s]
+0.0.N: Trace Attempt 13	[0.01 s]
+0.0.N: Stopped processing property "rxLinkFaultState.v_rxLinkFaultState._assert_6:precondition1"	[0.01 s].
+0.0.N: Stopped processing property "rxLinkFaultState.v_rxLinkFaultState._assert_16:precondition1"	[0.01 s].
+0.0.N: Interrupted. [0.01 s]
+0.0.N: Exited with Success (@ 0.02 s)
+0: ProofGrid usable level: 0
+0.0.Bm: Proofgrid shell started at 4533@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.Bm: Requesting engine job to terminate
+0.0.Hp: Exited with Success (@ 0.04 s)
+0.0.Bm: Preventing job from starting because proof is shutting down.
+0.0.Bm: Requesting engine job to terminate
+0.0.Bm: Interrupted. [0.00 s]
+0.0.Bm: Exited with Success (@ 0.04 s)
+0.0.B: Proofgrid shell started at 4537@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.B: Requesting engine job to terminate
+0.0.B: Preventing job from starting because proof is shutting down.
+0.0.B: Requesting engine job to terminate
+0.0.B: Interrupted. [0.00 s]
+0.0.Mpcustom4: Proofgrid shell started at 4534@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.Mpcustom4: Requesting engine job to terminate
+0.0.Oh: Proofgrid shell started at 4535@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.Oh: Requesting engine job to terminate
+0.0.B: Exited with Success (@ 0.04 s)
+0.0.Mpcustom4: Preventing job from starting because proof is shutting down.
+0.0.Mpcustom4: Requesting engine job to terminate
+0.0.Mpcustom4: Interrupted. [0.00 s]
+0.0.Oh: Preventing job from starting because proof is shutting down.
+0.0.Oh: Requesting engine job to terminate
+0.0.Oh: Interrupted. [0.00 s]
+0.0.Ht: Proofgrid shell started at 4532@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.Ht: Requesting engine job to terminate
+0.0.Ht: Preventing job from starting because proof is shutting down.
+0.0.Ht: Requesting engine job to terminate
+0.0.Mpcustom4: Exited with Success (@ 0.04 s)
+0.0.Oh: Exited with Success (@ 0.04 s)
+0.0.Ht: Interrupted. [0.00 s]
+0.0.AM: Proofgrid shell started at 4540@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.AM: Requesting engine job to terminate
+0.0.AM: Preventing job from starting because proof is shutting down.
+0.0.AM: Requesting engine job to terminate
+0.0.AM: Interrupted. [0.00 s]
+0.0.Ht: Exited with Success (@ 0.04 s)
+0.0.AM: Exited with Success (@ 0.04 s)
+0.0.L: Proofgrid shell started at 4536@pdx-xterm-153(local) jg_4366_pdx-xterm-153_1
+0.0.L: Requesting engine job to terminate
+0.0.L: Preventing job from starting because proof is shutting down.
+0.0.L: Requesting engine job to terminate
+0.0.L: Interrupted. [0.00 s]
+0.0.L: Exited with Success (@ 0.06 s)
+0: --------------------------------------------------------------
+ProofGrid Summary (utilization 7.29 %)
+--------------------------------------------------------------
+     engines started                               :     9
+     engine jobs started                           :     9
+
+    Average time in state (seconds)
+    ------------------------------------------------------
+    Engine  Pending     Running        Dead    Utilization
+    ------------------------------------------------------
+      N        0.03        0.01        0.00       28.48 %
+     Hp        0.03        0.01        0.00       34.01 %
+     Ht        0.04        0.00        0.00        0.00 %
+     Bm        0.03        0.00        0.00        0.00 %
+    Mpcustom4        0.04        0.00        0.00        0.00 %
+     Oh        0.04        0.00        0.00        0.00 %
+      L        0.05        0.00        0.00        0.00 %
+      B        0.04        0.00        0.00        0.00 %
+     AM        0.04        0.00        0.00        0.00 %
+    all        0.04        0.00        0.00        7.29 %
+
+    Total time in state (seconds)
+    -----------------------------------------
+            Pending     Running        Dead  
+    -----------------------------------------
+               0.33        0.03        0.00
+
+    Data read    : 12.86 kiB
+    Data written : 4.51 kiB
+
+0: All pending notifications were processed.
+INFO (IPF059): 0: Completed proof on task: "<embedded>"
+
+==============================================================
+SUMMARY
+==============================================================
+           Properties Considered              : 52
+                 assertions                   : 26
+                  - proven                    : 26 (100%)
+                  - bounded_proven (user)     : 0 (0%)
+                  - bounded_proven (auto)     : 0 (0%)
+                  - marked_proven             : 0 (0%)
+                  - cex                       : 0 (0%)
+                  - ar_cex                    : 0 (0%)
+                  - undetermined              : 0 (0%)
+                  - unknown                   : 0 (0%)
+                  - error                     : 0 (0%)
+                 covers                       : 26
+                  - unreachable               : 12 (46.1538%)
+                  - bounded_unreachable (user): 0 (0%)
+                  - covered                   : 14 (53.8462%)
+                  - ar_covered                : 0 (0%)
+                  - undetermined              : 0 (0%)
+                  - unknown                   : 0 (0%)
+                  - error                     : 0 (0%)
+determined
+[<embedded>] % 
+[<embedded>] % # Get proof results
+[<embedded>] % set proofs_status [get_status [get_property_list -include {type {assert} disabled {0}}]]
+proven
+[<embedded>] % 
+[<embedded>] % # Output the proof results
+[<embedded>] % puts "proofs: $proofs_status"
+proofs: proven
+[<embedded>] % 
+[<embedded>] % # Check if any properties failed (have status 'cex' or 'falsified')
+[<embedded>] % set failed_props [get_property_list -include {type {assert} status {cex falsified}}]
+WARNING (WPM042): No properties matched the specified filters.
+[<embedded>] % 
+[<embedded>] % if {[llength $failed_props] > 0} {
+    puts "Proof failed. Skipping coverage calculation."
+} else {
+    # Measure coverage for both stimuli models and COI 
+    check_cov -measure -type all -verbose
+
+    # Coverage reporting script 
+    # Define the list of coverage models and coverage types
+    set coverage_models {functional statement toggle expression branch}
+    set coverage_types {stimuli coi}
+
+    # Output header
+    puts "\nCOVERAGE REPORT"
+    puts "TYPE|MODEL|COVERAGE"
+    puts "--------------------"
+
+    # Loop over coverage types
+    foreach type $coverage_types {
+        # Loop over coverage models
+        foreach model $coverage_models {
+            if {$type == "coi"} {
+                # For 'coi' type, use the checker_mode option
+                set coverage_data [check_cov -report -model $model -type checker -checker_mode coi]
+            } else {
+                # For other types, use the regular check_cov command
+                set coverage_data [check_cov -report -model $model -type $type]
+            }
+            # Extract coverage percentage using regexp
+            if {[regexp {([0-9.]+)%} $coverage_data match coverage]} {
+                puts "$type|$model|$coverage"
+            } else {
+                puts "$type|$model|N/A"
+            }
+        }
+    }
+
+    # Insert Start Marker
+    puts "### COVERAGE_REPORT_START ###"
+
+    # List coverage items with status 'undetectable' in CSV format
+    set undetectable_coverage [check_cov -list -status undetectable -checker_mode coi]
+    puts "### UNDETECTABLE_START ###"
+    puts $undetectable_coverage
+    puts "### UNDETECTABLE_END ###"
+
+    # List coverage items with status 'unprocessed' in CSV format
+    set unprocessed_coverage [check_cov -list -status unprocessed -checker_mode coi]
+    puts "### UNPROCESSED_START ###"
+    puts $unprocessed_coverage
+    puts "### UNPROCESSED_END ###"
+
+    # Insert End Marker
+    puts "### COVERAGE_REPORT_END ###"
+}
+ADcustom15: Custom engine code is hT3N1rhP11/52HrFRS21ROp2f/ECJeRB2BntpcbnUXI9txEn0zdUa6yl2TWPj7N3NPuT4PqrTcByNC8Y8xZERDPYtLU+lkjupMtGnuZsi0scX/UkX6MKbUjnZYu0JF9jxJvzyauAWHMhgbOtUkH2paXi8elOtkArQxMXfbm+r+FhEgEA
+INFO (ICOV029): Measuring {stimuli , proof , bound} coverage for task {<embedded>}.
+Bmcustom16: Custom engine code is hT3NZbhP3fWY2AbBQnsjfOxn6c+6e6yL+/e8fY2SaNkPMwEA
+INFO (ICOV033): Starting {proof} measurement for task {<embedded>}.
+INFO (IPF036): Starting proof on task: "<embedded>", 26 properties to prove with 0 already proven/unreachable
+INFO (ICOV033): Starting {stimuli} measurement for task {<embedded>}.
+INFO (IPF031): Settings used for proof thread 2 {proof}:
+    orchestration                 = off
+    time_limit                    = 86398s
+    per_property_max_time_limit   = 86398s
+    per_property_time_limit       = 66460s * 2 ^ scan
+    engine_mode                   = N Ncustom6 AD ADcustom15 C I K AB AG 
+    proofgrid_per_engine_max_jobs = 1
+    max engine jobs               = N Ncustom6 AD ADcustom15 C I K AB AG, total 9
+    proofgrid_mode                = local
+    proofgrid_restarts            = 10
+INFO (IPF031): Settings used for proof thread 3:
+    orchestration                 = off
+    time_limit                    = 86398s
+    per_property_max_time_limit   = 86398s
+    per_property_time_limit       = 66460s * 2 ^ scan
+    engine_mode                   = N Ncustom6 AD ADcustom15 C I K AB AG 
+    proofgrid_per_engine_max_jobs = 1
+    max engine jobs               = N Ncustom6 AD ADcustom15 C I K AB AG, total 9
+    proofgrid_mode                = local
+    proofgrid_restarts            = 10
+INFO (IPF036): Starting proof on task: "<embedded>", 84 properties to prove with 0 already proven/unreachable
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_1" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_2" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_8" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF031): Settings used for proof thread 4 {stimuli}:
+    orchestration                 = on
+    time_limit                    = 86398s
+    per_property_time_limit       = 1s * 10 ^ scan
+    engine_mode                   = Hp Ht N B L TM Bmcustom16 
+    proofgrid_per_engine_max_jobs = 1
+    max engine jobs               = auto
+    proofgrid_mode                = local
+    proofgrid_restarts            = 10
+    prefer_shortest               = on
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_10" was proven in 0.00 s.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_1" in 0.00s.
+    Completed 1 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_2" in 0.00s.
+    Completed 2 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_8" in 0.00s.
+    Completed 3 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_10" in 0.00s.
+    Completed 4 out of 26 properties.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_11" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_11" in 0.00s.
+    Completed 5 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_9" in 0.00s.
+    Completed 6 out of 26 properties.
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_9" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_14" was proven in 0.00 s.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_14" in 0.00s.
+    Completed 7 out of 26 properties.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_15" was proven in 0.00 s.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_15" in 0.00s.
+    Completed 8 out of 26 properties.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_17" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_18" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_19" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_21" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_24" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_25" was proven in 0.00 s.
+3.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.PRE: The property "rxLinkFaultState.v_rxLinkFaultState._assert_26" was proven in 0.00 s.
+3: Found proofs for 15 properties in preprocessing
+3.0.N: Identified and disabled 1 duplicated target.
+3: About to start ProofGrid in its own thread with a limit of 10000 pending notifications and a limit of 10 traces.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_17" in 0.00s.
+    Completed 9 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_18" in 0.00s.
+    Completed 10 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_19" in 0.00s.
+    Completed 11 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_21" in 0.00s.
+    Completed 12 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_24" in 0.00s.
+    Completed 13 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_25" in 0.00s.
+    Completed 14 out of 26 properties.
+INFO (ICOV047): PRE: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_26" in 0.00s.
+    Completed 15 out of 26 properties.
+3: =============================== ProofGrid start ===============================
+3: ProofGrid usable level: 10
+3: Initial ProofGrid level: 1
+INFO (IPF031): Settings used for proof thread 5:
+    orchestration                 = on
+    time_limit                    = 86398s
+    per_property_time_limit       = 1s * 10 ^ scan
+    engine_mode                   = Hp Ht N B L TM Bmcustom16 
+    proofgrid_per_engine_max_jobs = 1
+    max engine jobs               = auto
+    proofgrid_mode                = local
+    proofgrid_restarts            = 10
+    prefer_shortest               = on
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__18___B__120_0_1" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__22___B__186_0_1" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__reset__2__T__89__11" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__seq_type[1]__23__T__107__14" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__seq_type[1]__23__T__107__14_fall" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__last_seq_type[1]__25__T__108__14" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__last_seq_type[1]__25__T__108__14_fall" was proven unreachable in 0.00 s.
+5: Found proofs for 7 properties in preprocessing
+5: Using multistage preprocessing
+5: Starting reduce
+5: Finished reduce in 0s
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__reset__2__T__89__11_fall" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__link_fault[1]__5__T__92__17" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__link_fault[1]__5__T__92__17_fall" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__linkstate[2]__10__T__104__14" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_toggle__linkstate[2]__10__T__104__14_fall" was proven unreachable in 0.00 s.
+5: Found proofs for 5 properties in preprocessing
+5.0.PRE: Performing Proof Simplification...
+5.0.N: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+5.0.N: Proof Simplification Iteration 1	[0.00 s]
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_branch_condition__case_stmt__4___B__131_0_1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__8___S__133_1_1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__9___S__134_1_1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__10___S__135_1_1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__11___S__136_1_1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__5___B__137_0_1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_branch_condition__if_stmt_else__19___B__120_1_1" was covered in 1 cycles in 0.00 s.
+INFO (IPF047): 5.0.PRE: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__20___B__186_1_1" was covered in 1 cycles in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 5.0.PRE: The cover property "_automatic_coveritem_branch_condition__if_stmt_empty_branch__13___B__144_3_1" was proven unreachable in 0.00 s.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 5.0.PRE: The property ":noDeadEnd" was proven in 0.00 s.
+    Use check_assumptions -show -dead_end to show this property in the property table.
+5.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 5.0.PRE: The property ":noConflict" was proven in 0.00 s.
+    Use check_assumptions -show to show this property in the property table.
+INFO (IPF047): 5.0.PRE: The cover property ":live" was covered in 1 cycles in 0.00 s.
+    Use check_assumptions -show -live to show this property in the property table.
+5.0.PRE: Proof Simplification completed in 0.00 s
+5.0.N: Identified and disabled 14 duplicated targets.
+5: About to start ProofGrid in its own thread with a limit of 10000 pending notifications and a limit of 10 traces.
+5: =============================== ProofGrid start ===============================
+5: ProofGrid usable level: 56
+5: Initial ProofGrid level: 1
+3: ProofGrid is starting event handling
+5: ProofGrid is starting event handling
+3.0.C: Proofgrid shell started at 4689@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.C: OS virtual memory limit : 8589934592 / 8589934592
+3.0.C: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_16" was proven in 0.00 s.
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_5" was proven in 0.00 s.
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_7" was proven in 0.00 s.
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_20" was proven in 0.00 s.
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_22" was proven in 0.00 s.
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_23" was proven in 0.00 s.
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_6" was proven in 0.00 s.
+3.0.C: Next scan (0) will use per property time limit: 66460s * 2 ^ 0 = 66460s
+3.0.C: Trace Attempt  1	[0.00 s]
+3.0.C: Partitioning 0 assumptions over 0 inputs...
+3.0.C: Iteration  1	[0.00 s]
+3.0.C: Iteration  2	[0.00 s]
+3.0.C: Iteration  3	[0.00 s]
+3.0.C: Trace Attempt  3	[0.00 s]
+3.0.ADcustom15: Proofgrid shell started at 4688@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_16" in 0.00s.
+    Completed 16 out of 26 properties.
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_5" in 0.00s.
+    Completed 17 out of 26 properties.
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_7" in 0.00s.
+    Completed 18 out of 26 properties.
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_20" in 0.00s.
+    Completed 19 out of 26 properties.
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_22" in 0.00s.
+    Completed 20 out of 26 properties.
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_23" in 0.00s.
+    Completed 21 out of 26 properties.
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_6" in 0.00s.
+    Completed 22 out of 26 properties.
+3.0.AB: Proofgrid shell started at 4693@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.C: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.C: The property "rxLinkFaultState.v_rxLinkFaultState._assert_3" was proven in 0.00 s.
+3.0.AB: OS virtual memory limit : 8589934592 / 8589934592
+3.0.AB: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+3.0.C: Trace Attempt  1	[0.00 s]
+3.0.AB: Next scan (0) will use per property time limit: 66460s * 2 ^ 0 = 66460s
+INFO (ICOV047): C: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_3" in 0.00s.
+    Completed 23 out of 26 properties.
+3.0.AB: Trace Attempt  1	[0.00 s]
+3.0.AB: Trace Attempt  2	[0.00 s]
+3.0.AB: Trace Attempt  3	[0.00 s]
+3.0.AB: Trace Attempt  4	[0.00 s]
+3.0.AB: Trace Attempt  5	[0.00 s]
+3.0.AB: Trace Attempt  1	[0.00 s]
+3.0.AB: Trace Attempt  2	[0.00 s]
+3.0.AB: Trace Attempt  3	[0.00 s]
+3.0.AB: Trace Attempt  4	[0.00 s]
+3.0.AB: Trace Attempt  5	[0.00 s]
+3.0.AB: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.AB: The property "rxLinkFaultState.v_rxLinkFaultState._assert_4" was proven in 0.00 s.
+INFO (ICOV047): AB: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_4" in 0.00s.
+    Completed 24 out of 26 properties.
+3.0.AB: Trace Attempt  1	[0.00 s]
+3.0.AB: Trace Attempt  2	[0.00 s]
+3.0.AB: Trace Attempt  3	[0.00 s]
+3.0.AB: Trace Attempt  4	[0.00 s]
+3.0.AB: Trace Attempt  1	[0.00 s]
+3.0.AB: Trace Attempt  2	[0.00 s]
+3.0.AB: Trace Attempt  3	[0.00 s]
+3.0.AB: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.AB: The property "rxLinkFaultState.v_rxLinkFaultState._assert_12" was proven in 0.00 s.
+INFO (ICOV047): AB: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_12" in 0.00s.
+    Completed 25 out of 26 properties.
+3.0.C: Partitioning 1 assumptions over 2 inputs...
+3.0.AB: Last scan. Per property time limit: 0s
+3.0.C: Iteration  1	[0.00 s]
+3.0.AB: Trace Attempt  1	[0.00 s]
+3.0.AB: Trace Attempt  2	[0.00 s]
+3.0.AB: Trace Attempt  3	[0.00 s]
+3.0.AB: Trace Attempt  4	[0.00 s]
+3.0.C: Iteration  2	[0.00 s]
+3.0.AB: Trace Attempt  1	[0.00 s]
+3.0.AB: Trace Attempt  2	[0.00 s]
+3.0.AB: Trace Attempt  3	[0.00 s]
+3.0.C: Requesting engine job to stop
+3.0.AB: Requesting engine job to stop
+INFO (IPF144): 3: Initiating shutdown of proof [0.01 s]
+3.0.AB: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 3.0.AB: The property "rxLinkFaultState.v_rxLinkFaultState._assert_13" was proven in 0.00 s.
+3.0.C: Interrupted. [0.00 s]
+INFO (ICOV047): AB: Coverage measurement of type "proof" finished for property "<embedded>::rxLinkFaultState.v_rxLinkFaultState._assert_13" in 0.00s.
+    Completed 26 out of 26 properties.
+3.0.AB: Interrupted. [0.00 s]
+3.0.ADcustom15: OS virtual memory limit : 8589934592 / 8589934592
+3.0.C: Exited with Success (@ 0.01 s)
+3: ProofGrid usable level: 0
+3.0.ADcustom15: Requesting engine job to terminate
+3.0.ADcustom15: Interrupted. [0.00 s]
+5.0.Hp: Proofgrid shell started at 4696@pdx-xterm-153(local) jg_4366_pdx-xterm-153_3
+5: Ht: Starting partitioning method "even", 1 partitions
+5: Ht: Partitioning completed: Method: "even", Partitions: 1, Cardinalities: [ 56 ], Time: 0s
+3.0.N: Proofgrid shell started at 4684@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.N: Requesting engine job to terminate
+3.0.N: Preventing job from starting because proof is shutting down.
+3.0.N: Requesting engine job to terminate
+3.0.N: Interrupted. [0.00 s]
+3.0.AB: Exited with Success (@ 0.02 s)
+3.0.ADcustom15: Exited with Success (@ 0.02 s)
+3.0.N: Exited with Success (@ 0.02 s)
+5.0.Hp: OS virtual memory limit : 8589934592 / 8589934592
+5.0.Hp: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+3.0.I: Proofgrid shell started at 4691@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.I: Requesting engine job to terminate
+3.0.I: Preventing job from starting because proof is shutting down.
+3.0.I: Requesting engine job to terminate
+3.0.I: Interrupted. [0.00 s]
+3.0.AD: Proofgrid shell started at 4686@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.AD: Requesting engine job to terminate
+5: ProofGrid usable level: 4294967295
+5.0.N: Proofgrid shell started at 4694@pdx-xterm-153(local) jg_4366_pdx-xterm-153_3
+5.0.Hp: Trace Attempt  1	[0.00 s]
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_empty_branch__6___B__137_1_1" was covered in 1 cycles in 0.02 s.
+5.0.Hp: A proof was found: No trace exists. [0.01 s]
+INFO (IPF051): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__case_stmt_implicit_default__17___B__131_0_1" was proven unreachable in 0.02 s.
+5.0.Hp: Trace Attempt  2	[0.01 s]
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__case_stmt__7___B__131_1_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__13___S__142_1_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__14___S__143_1_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_else__9___B__145_1_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_empty_branch__11___B__154_1_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__12___B__144_2_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__14___B__144_1_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__15___B__144_0_1" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__local_fault__3__T__90__11" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__local_fault__3__T__90__11_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__remote_fault__4__T__91__11" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__fault_type__7__T__100__11" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__remote_fault__4__T__91__11_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__fault_type__7__T__100__11_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__get_one_fault__8__T__101__11" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__get_one_fault__8__T__101__11_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__no_new_type__9__T__102__11_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate[0]__12__T__104__14" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate_next[2]__13__T__104__25" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate_next[2]__13__T__104__25_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate_next[1]__14__T__104__25" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate_next[1]__14__T__104__25_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate_next[0]__15__T__104__25" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate_next[0]__15__T__104__25_fall" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__seq_type[0]__24__T__107__14" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__seq_cnt_3__28__T__111__14" was covered in 2 cycles in 0.02 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__seq_cnt_3__28__T__111__14_fall" was covered in 2 cycles in 0.02 s.
+3.0.I: Exited with Success (@ 0.04 s)
+3.0.AD: Preventing job from starting because proof is shutting down.
+3.0.AD: Requesting engine job to terminate
+3.0.AD: Interrupted. [0.00 s]
+5: Bmcustom16: Starting partitioning method "even", 1 partitions
+5: Bmcustom16: Partitioning completed: Method: "even", Partitions: 1, Cardinalities: [ 31 ], Time: 0s
+5.0.N: OS virtual memory limit : 8589934592 / 8589934592
+3.0.AD: Exited with Success (@ 0.04 s)
+3.0.Ncustom6: Proofgrid shell started at 4685@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.Ncustom6: Requesting engine job to terminate
+3.0.K: Proofgrid shell started at 4692@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.K: Requesting engine job to terminate
+3.0.Ncustom6: Preventing job from starting because proof is shutting down.
+3.0.Ncustom6: Requesting engine job to terminate
+3.0.Ncustom6: Interrupted. [0.00 s]
+3.0.Ncustom6: Exited with Success (@ 0.04 s)
+3.0.K: Preventing job from starting because proof is shutting down.
+3.0.K: Requesting engine job to terminate
+3.0.K: Interrupted. [0.00 s]
+5.0.Hp: Trace Attempt  3	[0.02 s]
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__8___B__145_0_1" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__case_stmt__16___B__131_2_1" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__21___S__162_1_1" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__22___S__163_1_1" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_stmt_condition__nonblocking_assignment__23___S__164_1_1" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_branch_condition__if_stmt_else__21___B__186_2_1" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__no_new_type__9__T__102__11" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate[1]__11__T__104__14" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate[0]__12__T__104__14_fall" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__seq_cnt__22__T__106__14" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__seq_type[0]__24__T__107__14_fall" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__last_seq_type[0]__26__T__108__14" was covered in 3 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__reset_col_cnt__27__T__110__14_fall" was covered in 3 cycles in 0.03 s.
+5.0.N: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+5.0.N: Next scan (0) will use per property time limit: 1s * 10 ^ 0 = 1s
+5.0.N: Trace Attempt  1	[0.00 s]
+5.0.N: A max_length bound was found. The shortest trace is no longer than 4096 cycles. [0.00 s]
+5.0.N: Trace Attempt  2	[0.00 s]
+5.0.N: Trace Attempt  2	[0.00 s]
+5.0.N: Trace Attempt  3	[0.00 s]
+5.0.N: Trace Attempt  4	[0.00 s]
+5.0.N: Trace Attempt  5	[0.00 s]
+5.0.N: Trace Attempt  5	[0.00 s]
+5.0.N: Trace Attempt  1	[0.00 s]
+5.0.N: Trace Attempt  2	[0.00 s]
+5.0.N: Trace Attempt  3	[0.00 s]
+5.0.N: Trace Attempt  5	[0.00 s]
+5.0.Hp: Trace Attempt  4	[0.03 s]
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__linkstate[1]__11__T__104__14_fall" was covered in 4 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__col_cnt[0]__21__T__105__14" was covered in 4 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__last_seq_type[0]__26__T__108__14_fall" was covered in 4 cycles in 0.03 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__reset_col_cnt__27__T__110__14" was covered in 4 cycles in 0.03 s.
+5.0.N: Trace Attempt  1	[0.01 s]
+5.0.N: Trace Attempt  2	[0.01 s]
+5.0.N: Trace Attempt  3	[0.01 s]
+5.0.N: Trace Attempt  5	[0.01 s]
+5.0.Hp: Trace Attempt  5	[0.04 s]
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__col_cnt[1]__20__T__105__14" was covered in 5 cycles in 0.04 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__col_cnt[0]__21__T__105__14_fall" was covered in 5 cycles in 0.04 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__seq_cnt__22__T__106__14_fall" was covered in 5 cycles in 0.04 s.
+3.0.AG: Proofgrid shell started at 4695@pdx-xterm-153(local) jg_4366_pdx-xterm-153_2
+3.0.AG: Requesting engine job to terminate
+3.0.K: Exited with Success (@ 0.07 s)
+3.0.AG: Preventing job from starting because proof is shutting down.
+3.0.AG: Requesting engine job to terminate
+3.0.AG: Interrupted. [0.00 s]
+3.0.AG: Exited with Success (@ 0.07 s)
+3: --------------------------------------------------------------
+ProofGrid Summary (utilization 1.89 %)
+--------------------------------------------------------------
+     engines started                               :     9
+     engine jobs started                           :     9
+
+    Average time in state (seconds)
+    ------------------------------------------------------
+    Engine  Pending     Running        Dead    Utilization
+    ------------------------------------------------------
+      N        0.07        0.00        0.00        0.00 %
+    Ncustom6        0.09        0.00        0.00        0.00 %
+     AD        0.09        0.00        0.00        0.00 %
+    ADcustom15        0.05        0.00        0.00        0.00 %
+      C        0.05        0.01        0.00       16.40 %
+      I        0.07        0.00        0.00        0.00 %
+      K        0.09        0.00        0.00        0.00 %
+     AB        0.05        0.00        0.00        7.24 %
+     AG        0.11        0.00        0.00        0.00 %
+    all        0.07        0.00        0.00        1.89 %
+
+    Total time in state (seconds)
+    -----------------------------------------
+            Pending     Running        Dead  
+    -----------------------------------------
+               0.66        0.01        0.00
+
+    Data read    : 5.60 kiB
+    Data written : 3.56 kiB
+
+3: All pending notifications were processed.
+INFO (ICOV034): Finished {proof} measurement for task {<embedded>}.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__link_fault[0]__6__T__92__17" was covered in 6 cycles in 0.05 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__col_cnt[1]__20__T__105__14_fall" was covered in 6 cycles in 0.05 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__link_fault[0]__6__T__92__17_fall" was covered in 7 cycles in 0.05 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__col_cnt[2]__19__T__105__14" was covered in 7 cycles in 0.05 s.
+INFO (IPF047): 5.0.Hp: The cover property "_automatic_coveritem_toggle__col_cnt[2]__19__T__105__14_fall" was covered in 8 cycles in 0.06 s.
+5.0.Ht: Proofgrid shell started at 4872@pdx-xterm-153(local) jg_4366_pdx-xterm-153_3
+5.0.Ht: OS virtual memory limit : 8589934592 / 8589934592
+5.0.Ht: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+5.0.Ht: Trace Attempt  1	[0.00 s]
+5.0.Ht: Trace Attempt  2	[0.00 s]
+5.0.Ht: Trace Attempt  3	[0.00 s]
+5.0.Ht: Trace Attempt  4	[0.00 s]
+5.0.Ht: Trace Attempt  5	[0.00 s]
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt[3]__18__T__105__14" was covered in 11 cycles in 0.00 s.
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt[3]__18__T__105__14_fall" was covered in 12 cycles in 0.00 s.
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt[4]__17__T__105__14" was covered in 19 cycles in 0.00 s.
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt[4]__17__T__105__14_fall" was covered in 20 cycles in 0.00 s.
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt[5]__16__T__105__14" was covered in 35 cycles in 0.00 s.
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt[5]__16__T__105__14_fall" was covered in 36 cycles in 0.00 s.
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_branch_condition__if_stmt_then__10___B__154_0_1" was covered in 66 cycles in 0.01 s.
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt_64__29__T__112__14" was covered in 66 cycles in 0.01 s.
+5.0.N: Trace Attempt 54	[0.04 s]
+5.0.N: Last scan. Per property time limit: 0s
+5.0.N: Requesting engine job to stop
+5.0.Hp: Requesting engine job to terminate
+5.0.Ht: Requesting engine job to terminate
+INFO (IPF144): 5: Initiating shutdown of proof [0.08 s]
+INFO (IPF047): 5.0.Ht: The cover property "_automatic_coveritem_toggle__col_cnt_64__29__T__112__14_fall" was covered in 67 cycles in 0.01 s.
+5.0.Ht: Trace Attempt 67	[0.01 s]
+5.0.Ht: All properties determined. [0.01 s]
+5.0.N: Interrupted. [0.00 s]
+5.0.N: Exited with Success (@ 0.08 s)
+5: ProofGrid usable level: 0
+5.0.Bmcustom16: Proofgrid shell started at 4888@pdx-xterm-153(local) jg_4366_pdx-xterm-153_3
+5.0.Bmcustom16: Requesting engine job to terminate
+5.0.Ht: Exited with Success (@ 0.08 s)
+5.0.Bmcustom16: Preventing job from starting because proof is shutting down.
+5.0.Bmcustom16: Requesting engine job to terminate
+5.0.Bmcustom16: Interrupted. [0.00 s]
+5.0.Hp: Interrupted (multi)
+5.0.Hp: Trace Attempt 10	[0.07 s]
+5.0.Hp: Interrupted. [0.08 s]
+5.0.Bmcustom16: Exited with Success (@ 0.08 s)
+5.0.L: Proofgrid shell started at 4876@pdx-xterm-153(local) jg_4366_pdx-xterm-153_3
+5.0.L: Requesting engine job to terminate
+5.0.Hp: Exited with Success (@ 0.09 s)
+5.0.L: Preventing job from starting because proof is shutting down.
+5.0.L: Requesting engine job to terminate
+5.0.L: Interrupted. [0.00 s]
+5.0.B: Proofgrid shell started at 4890@pdx-xterm-153(local) jg_4366_pdx-xterm-153_3
+5.0.B: Requesting engine job to terminate
+5.0.L: Exited with Success (@ 0.09 s)
+5.0.B: Preventing job from starting because proof is shutting down.
+5.0.B: Requesting engine job to terminate
+5.0.B: Interrupted. [0.00 s]
+5.0.B: Exited with Success (@ 0.10 s)
+5: --------------------------------------------------------------
+ProofGrid Summary (utilization 24.13 %)
+--------------------------------------------------------------
+     engines started                               :     7
+     engine jobs started                           :     6
+
+    Average time in state (seconds)
+    ------------------------------------------------------
+    Engine  Pending     Running        Dead    Utilization
+    ------------------------------------------------------
+      N        0.08        0.05        0.00       36.01 %
+     Hp        0.06        0.08        0.00       55.79 %
+     Ht        0.07        0.01        0.00       11.15 %
+      L        0.08        0.00        0.00        0.00 %
+    Bmcustom16        0.05        0.00        0.00        0.00 %
+      B        0.07        0.00        0.00        0.00 %
+    all        0.07        0.02        0.00       24.13 %
+
+    Total time in state (seconds)
+    -----------------------------------------
+            Pending     Running        Dead  
+    -----------------------------------------
+               0.41        0.13        0.00
+
+    Data read    : 29.61 kiB
+    Data written : 8.10 kiB
+
+5: All pending notifications were processed.
+INFO (ICOV034): Finished {stimuli} measurement for task {<embedded>}.
+INFO (ICOV033): Starting {deadcode} measurement for task {<embedded>}.
+INFO (ICOV028): Loading coverage metrics from prove/hunt results.
+INFO (ICOV033): Starting {coi} measurement for task {<embedded>}.
+INFO (IPF036): Starting proof on task: "<embedded>", 18 properties to prove with 0 already proven/unreachable
+INFO (ICOV034): Finished {coi} measurement for task {<embedded>}.
+INFO (IPF031): Settings used for proof thread 7:
+    orchestration                 = on
+    time_limit                    = 86396s
+    per_property_time_limit       = 1s * 10 ^ scan
+    engine_mode                   = Hp Ht N B L J Bm 
+    proofgrid_per_engine_max_jobs = 1
+    max engine jobs               = auto
+    proofgrid_mode                = local
+    proofgrid_restarts            = 10
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_1:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_2:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_3:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_4:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_12:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_13:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__seq_type[1]__23__T__107__14" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__seq_type[1]__23__T__107__14_fall" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__last_seq_type[1]__25__T__108__14" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__last_seq_type[1]__25__T__108__14_fall" was proven unreachable in 0.00 s.
+7: Found proofs for 10 properties in preprocessing
+7: Using multistage preprocessing
+7: Starting reduce
+7: Finished reduce in 0s
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__link_fault[1]__5__T__92__17" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__link_fault[1]__5__T__92__17_fall" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__linkstate[2]__10__T__104__14" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_toggle__linkstate[2]__10__T__104__14_fall" was proven unreachable in 0.00 s.
+7: Found proofs for 4 properties in preprocessing
+7.0.PRE: Performing Proof Simplification...
+7.0.N: clocks: 2, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 1, bothedge: 0
+7.0.N: Clocks that will never have a posedge: ~link_fault[1]_FLOP_ASYNC_MODEL [vTrue], 
+7.0.N: Proof Simplification Iteration 1	[0.00 s]
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_22:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "rxLinkFaultState.v_rxLinkFaultState._assert_23:precondition1" was proven unreachable in 0.00 s.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 7.0.PRE: The property ":noDeadEnd" was proven in 0.00 s.
+    Use check_assumptions -show -dead_end to show this property in the property table.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF057): 7.0.PRE: The property ":noConflict" was proven in 0.00 s.
+    Use check_assumptions -show to show this property in the property table.
+INFO (IPF047): 7.0.PRE: The cover property ":live" was covered in 1 cycles in 0.00 s.
+    Use check_assumptions -show -live to show this property in the property table.
+7.0.PRE: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.PRE: The cover property "_automatic_coveritem_branch_condition__if_stmt_empty_branch__13___B__144_3_1" was proven unreachable in 0.00 s.
+7.0.PRE: Proof Simplification completed in 0.00 s
+7: About to start ProofGrid in its own thread with a limit of 10000 pending notifications and a limit of 10 traces.
+7: =============================== ProofGrid start ===============================
+7: ProofGrid usable level: 1
+7: Initial ProofGrid level: 1
+7: ProofGrid is starting event handling
+7.0.N: Proofgrid shell started at 5009@pdx-xterm-153(local) jg_4366_pdx-xterm-153_4
+7: Ht: Starting partitioning method "even", 1 partitions
+7: Ht: Partitioning completed: Method: "even", Partitions: 1, Cardinalities: [ 1 ], Time: 0s
+7: ProofGrid usable level: 4294967295
+7.0.N: OS virtual memory limit : 8589934592 / 8589934592
+7.0.N: clocks: 1, declared: 1, looping: 0, posedge: 1, negedge: 0, noedge: 0, bothedge: 0
+7.0.N: Last scan. Per property time limit: 0s
+7: Bm: Starting partitioning method "even", 1 partitions
+7: Bm: Partitioning completed: Method: "even", Partitions: 1, Cardinalities: [ 1 ], Time: 0s
+7.0.N: Trace Attempt  1	[0.00 s]
+7.0.N: A max_length bound was found. The shortest trace is no longer than 4096 cycles. [0.00 s]
+7.0.N: Trace Attempt  2	[0.00 s]
+7.0.N: Trace Attempt  2	[0.00 s]
+7.0.N: Trace Attempt  3	[0.00 s]
+7.0.N: Trace Attempt  3	[0.00 s]
+7.0.N: Trace Attempt  4	[0.00 s]
+7.0.N: Trace Attempt  5	[0.00 s]
+7.0.N: Requesting engine job to stop
+INFO (IPF144): 7: Initiating shutdown of proof [0.00 s]
+7.0.N: Trace Attempt  8	[0.00 s]
+7.0.N: A proof was found: No trace exists. [0.00 s]
+INFO (IPF051): 7.0.N: The cover property "_automatic_coveritem_branch_condition__case_stmt_implicit_default__17___B__131_0_1" was proven unreachable in 0.00 s.
+7.0.N: All properties determined. [0.00 s]
+7.0.Hp: Proofgrid shell started at 5010@pdx-xterm-153(local) jg_4366_pdx-xterm-153_4
+7.0.Hp: Requesting engine job to terminate
+7.0.N: Exited with Success (@ 0.01 s)
+7: ProofGrid usable level: 0
+7.0.Hp: Preventing job from starting because proof is shutting down.
+7.0.Hp: Requesting engine job to terminate
+7.0.Hp: Interrupted. [0.00 s]
+7.0.Hp: Exited with Success (@ 0.01 s)
+7.0.Ht: Proofgrid shell started at 5043@pdx-xterm-153(local) jg_4366_pdx-xterm-153_4
+7.0.Ht: Requesting engine job to terminate
+7.0.Ht: Preventing job from starting because proof is shutting down.
+7.0.Ht: Requesting engine job to terminate
+7.0.Ht: Interrupted. [0.00 s]
+7.0.Bm: Proofgrid shell started at 5047@pdx-xterm-153(local) jg_4366_pdx-xterm-153_4
+7.0.Bm: Requesting engine job to terminate
+7.0.Ht: Exited with Success (@ 0.04 s)
+7.0.Bm: Preventing job from starting because proof is shutting down.
+7.0.Bm: Requesting engine job to terminate
+7.0.Bm: Interrupted. [0.00 s]
+7.0.J: Proofgrid shell started at 5045@pdx-xterm-153(local) jg_4366_pdx-xterm-153_4
+7.0.J: Requesting engine job to terminate
+7.0.L: Proofgrid shell started at 5044@pdx-xterm-153(local) jg_4366_pdx-xterm-153_4
+7.0.L: Requesting engine job to terminate
+7.0.J: Preventing job from starting because proof is shutting down.
+7.0.J: Requesting engine job to terminate
+7.0.J: Interrupted. [0.00 s]
+7.0.Bm: Exited with Success (@ 0.04 s)
+7.0.L: Preventing job from starting because proof is shutting down.
+7.0.L: Requesting engine job to terminate
+7.0.L: Interrupted. [0.00 s]
+7.0.J: Exited with Success (@ 0.04 s)
+7.0.L: Exited with Success (@ 0.04 s)
+7: --------------------------------------------------------------
+ProofGrid Summary (utilization 1.47 %)
+--------------------------------------------------------------
+     engines started                               :     6
+     engine jobs started                           :     6
+
+    Average time in state (seconds)
+    ------------------------------------------------------
+    Engine  Pending     Running        Dead    Utilization
+    ------------------------------------------------------
+      N        0.04        0.00        0.00        8.80 %
+     Hp        0.04        0.00        0.00        0.00 %
+     Ht        0.03        0.00        0.00        0.00 %
+      L        0.04        0.00        0.00        0.00 %
+      J        0.04        0.00        0.00        0.00 %
+     Bm        0.04        0.00        0.00        0.00 %
+    all        0.04        0.00        0.00        1.47 %
+
+    Total time in state (seconds)
+    -----------------------------------------
+            Pending     Running        Dead  
+    -----------------------------------------
+               0.23        0.00        0.00
+
+    Data read    : 2.99 kiB
+    Data written : 1.22 kiB
+
+7: All pending notifications were processed.
+INFO (ICOV034): Finished {deadcode} measurement for task {<embedded>}.
+
+COVERAGE REPORT
+TYPE|MODEL|COVERAGE
+--------------------
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| STIMULI COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: covergroup, user                                                                              |
+| Total Cover Items: 26                                                                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Stimuli                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |53.85% (14/26)                            |
+||--v_rxLinkFaultState                                       |53.85% (14/26)                            |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+stimuli|functional|53.85
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| STIMULI COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: statement                                                                                     |
+| Total Cover Items: 27                                                                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Stimuli                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |74.07% (20/27)                            |
+||--v_rxLinkFaultState                                       |0.00% (0/0)                               |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+stimuli|statement|74.07
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| STIMULI COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: toggle                                                                                        |
+| Total Cover Items: 58                                                                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Stimuli                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |82.76% (48/58)                            |
+||--v_rxLinkFaultState                                       |82.76% (24/29)                            |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+stimuli|toggle|82.76
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| STIMULI COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: expression                                                                                    |
+| Total Cover Items: 0                                                                                  |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Stimuli                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |0.00% (0/0)                               |
+||--v_rxLinkFaultState                                       |0.00% (0/0)                               |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+stimuli|expression|0.00
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| STIMULI COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: branch                                                                                        |
+| Total Cover Items: 19                                                                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Stimuli                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |78.95% (15/19)                            |
+||--v_rxLinkFaultState                                       |0.00% (0/0)                               |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+stimuli|branch|78.95
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| CHECKER COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: covergroup, user                                                                              |
+| Total Cover Items: 104                                                                                |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Checker                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |88.46% (92/104)                           |
+||--v_rxLinkFaultState                                       |72.41% (21/29)                            |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+coi|functional|88.46
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| CHECKER COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: statement                                                                                     |
+| Total Cover Items: 27                                                                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Checker                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |100.00% (27/27)                           |
+||--v_rxLinkFaultState                                       |0.00% (0/0)                               |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+coi|statement|100.00
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| CHECKER COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: toggle                                                                                        |
+| Total Cover Items: 58                                                                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Checker                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |79.31% (46/58)                            |
+||--v_rxLinkFaultState                                       |72.41% (21/29)                            |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+coi|toggle|79.31
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| CHECKER COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: expression                                                                                    |
+| Total Cover Items: 0                                                                                  |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Checker                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |0.00% (0/0)                               |
+||--v_rxLinkFaultState                                       |0.00% (0/0)                               |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+coi|expression|0.00
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| CHECKER COVERAGE                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Total Tasks: 1( <embedded> )                                                                          |
+| Models: branch                                                                                        |
+| Total Cover Items: 19                                                                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Instance Name                                              | Checker                                  |
+|                                                            | Coverage                                 |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|rxLinkFaultState                                            |100.00% (19/19)                           |
+||--v_rxLinkFaultState                                       |0.00% (0/0)                               |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+coi|branch|100.00
+### COVERAGE_REPORT_START ###
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Coverage Statuses: undetectable                                                                                                                                                                                                                                                     |
+| Models: all                                                                                                                                                                                                                                                                         |
+| Task Name:<embedded>                                                                                                                                                                                                                                                                |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Formal Status                | Stimuli Status | Checker Status | Description                                                                                                                                                                        | Source             | Cover    |
+|                              |                |                |                                                                                                                                                                                    | Loc.               | Item ID  |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "seq_cnt_3"                                                                                                                                                   |(111,14)-(111,23)   |74        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "linkstate_next[2]"                                                                                                                                           |(104,25)-(104,39)   |59        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "linkstate_next[1]"                                                                                                                                           |(104,25)-(104,39)   |60        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "linkstate_next[0]"                                                                                                                                           |(104,25)-(104,39)   |61        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "v_rxLinkFaultState.reset_col_cnt"                                                                                                                            |(6,16)-(6,29)       |86        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "v_rxLinkFaultState.seq_cnt_3"                                                                                                                                |(7,15)-(7,24)       |87        |
+|Deadcode                      |Deadcode        |Undetectable    |toggle for signal bit "v_rxLinkFaultState.linkstate[2]"                                                                                                                             |(4,16)-(4,25)       |79        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "v_rxLinkFaultState.linkstate[1]"                                                                                                                             |(4,16)-(4,25)       |80        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "v_rxLinkFaultState.linkstate[0]"                                                                                                                             |(4,16)-(4,25)       |81        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "v_rxLinkFaultState.linkstate_next[2]"                                                                                                                        |(4,27)-(4,41)       |82        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "v_rxLinkFaultState.linkstate_next[1]"                                                                                                                        |(4,27)-(4,41)       |83        |
+|Unreachable or Undetectable   |Covered         |Undetectable    |toggle for signal bit "v_rxLinkFaultState.linkstate_next[0]"                                                                                                                        |(4,27)-(4,41)       |84        |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|Total number of Cover Items: 12                                                                                                                                                                                                                                                      |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+### UNDETECTABLE_START ###
+{ formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "seq_cnt_3"} source_location {(111,14)-(111,23)} expression {Rise Expression: !seq_cnt_3 ##1 seq_cnt_3, Fall Expression: seq_cnt_3 ##1 !seq_cnt_3} instance {} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv} waived {False} cid {74} cover_item_type {toggle} module {rxLinkFaultState} caused_by {-} bound {2}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "linkstate_next[2]"} source_location {(104,25)-(104,39)} expression {Rise Expression: !linkstate_next[2] ##1 linkstate_next[2], Fall Expression: linkstate_next[2] ##1 !linkstate_next[2]} instance {} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv} waived {False} cid {59} cover_item_type {toggle} module {rxLinkFaultState} caused_by {-} bound {2}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "linkstate_next[1]"} source_location {(104,25)-(104,39)} expression {Rise Expression: !linkstate_next[1] ##1 linkstate_next[1], Fall Expression: linkstate_next[1] ##1 !linkstate_next[1]} instance {} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv} waived {False} cid {60} cover_item_type {toggle} module {rxLinkFaultState} caused_by {-} bound {2}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "linkstate_next[0]"} source_location {(104,25)-(104,39)} expression {Rise Expression: !linkstate_next[0] ##1 linkstate_next[0], Fall Expression: linkstate_next[0] ##1 !linkstate_next[0]} instance {} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sv} waived {False} cid {61} cover_item_type {toggle} module {rxLinkFaultState} caused_by {-} bound {2}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.reset_col_cnt"} source_location {(6,16)-(6,29)} expression {Rise Expression: !v_rxLinkFaultState.reset_col_cnt ##1 v_rxLinkFaultState.reset_col_cnt, Fall Expression: v_rxLinkFaultState.reset_col_cnt ##1 !v_rxLinkFaultState.reset_col_cnt} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {86} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {-} bound {4}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.seq_cnt_3"} source_location {(7,15)-(7,24)} expression {Rise Expression: !v_rxLinkFaultState.seq_cnt_3 ##1 v_rxLinkFaultState.seq_cnt_3, Fall Expression: v_rxLinkFaultState.seq_cnt_3 ##1 !v_rxLinkFaultState.seq_cnt_3} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {87} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {-} bound {2}} { formal_status {Deadcode} stimuli_status {Deadcode} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.linkstate[2]"} source_location {(4,16)-(4,25)} expression {Rise Expression: !v_rxLinkFaultState.linkstate[2] ##1 v_rxLinkFaultState.linkstate[2], Fall Expression: v_rxLinkFaultState.linkstate[2] ##1 !v_rxLinkFaultState.linkstate[2]} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {79} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {deadcode} bound {Infinite}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.linkstate[1]"} source_location {(4,16)-(4,25)} expression {Rise Expression: !v_rxLinkFaultState.linkstate[1] ##1 v_rxLinkFaultState.linkstate[1], Fall Expression: v_rxLinkFaultState.linkstate[1] ##1 !v_rxLinkFaultState.linkstate[1]} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {80} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {-} bound {4}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.linkstate[0]"} source_location {(4,16)-(4,25)} expression {Rise Expression: !v_rxLinkFaultState.linkstate[0] ##1 v_rxLinkFaultState.linkstate[0], Fall Expression: v_rxLinkFaultState.linkstate[0] ##1 !v_rxLinkFaultState.linkstate[0]} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {81} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {-} bound {3}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.linkstate_next[2]"} source_location {(4,27)-(4,41)} expression {Rise Expression: !v_rxLinkFaultState.linkstate_next[2] ##1 v_rxLinkFaultState.linkstate_next[2], Fall Expression: v_rxLinkFaultState.linkstate_next[2] ##1 !v_rxLinkFaultState.linkstate_next[2]} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {82} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {-} bound {2}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.linkstate_next[1]"} source_location {(4,27)-(4,41)} expression {Rise Expression: !v_rxLinkFaultState.linkstate_next[1] ##1 v_rxLinkFaultState.linkstate_next[1], Fall Expression: v_rxLinkFaultState.linkstate_next[1] ##1 !v_rxLinkFaultState.linkstate_next[1]} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {83} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {-} bound {2}} { formal_status {Unreachable or Undetectable} stimuli_status {Covered} checker_status {Undetectable} description {toggle for signal bit "v_rxLinkFaultState.linkstate_next[0]"} source_location {(4,27)-(4,41)} expression {Rise Expression: !v_rxLinkFaultState.linkstate_next[0] ##1 v_rxLinkFaultState.linkstate_next[0], Fall Expression: v_rxLinkFaultState.linkstate_next[0] ##1 !v_rxLinkFaultState.linkstate_next[0]} instance {v_rxLinkFaultState} file {/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-11-09T20-24-55.405176_pdx-xterm-153_liwan/tmp_sva/design2sva_assertionbench_rxLinkFaultState__0/design2sva_assertionbench_rxLinkFaultState.sva} waived {False} cid {84} cover_item_type {toggle} module {i_rxLinkFaultState} caused_by {-} bound {2}}
+### UNDETECTABLE_END ###
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Coverage Statuses: unprocessed                                                                                                                                                                                                                                                      |
+| Models: all                                                                                                                                                                                                                                                                         |
+| Task Name:<embedded>                                                                                                                                                                                                                                                                |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+| Formal Status                | Stimuli Status | Checker Status | Description                                                                                                                                                                        | Source             | Cover    |
+|                              |                |                |                                                                                                                                                                                    | Loc.               | Item ID  |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+|Total number of Cover Items: 0                                                                                                                                                                                                                                                       |
+|+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+
+### UNPROCESSED_START ###
+
+### UNPROCESSED_END ###
+### COVERAGE_REPORT_END ###
+[<embedded>] % exit -force
+[<embedded>] % INFO (IPL005): Received request to exit from the console.
+INFO (IPL014): Waiting for the Tcl-thread to exit.
+INFO: Waiting for proof threads to stop...
+INFO: Proof threads stopped.
+INFO (IPL018): The peak resident set memory use for this session was 0.381 GB.
+INFO (IPL015): The Tcl-thread exited with status 0.
+INFO (IPL016): Exiting the analysis session with status 0.

@@ -1,0 +1,29 @@
+# Essential ML/AI packages
+torch>=2.0.0
+transformers>=4.30.0
+sentence-transformers
+numpy>=1.23.0,<2.0
+scipy>=1.11.0
+scikit-learn
+pandas
+
+# AutoGen and related
+pyautogen
+chromadb
+openai
+
+# Utility packages
+tqdm
+requests
+pyyaml
+python-dotenv
+
+# Development tools
+ipython
+matplotlib
+seaborn
+networkx>=3.2
+
+# Optional: GPU support (uncomment if needed)
+# torchvision
+# torchaudio 

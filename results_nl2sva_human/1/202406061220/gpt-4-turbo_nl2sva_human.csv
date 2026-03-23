@@ -1,0 +1,5747 @@
+experiment_id,task_id,model_name,response,ref_solution,design_rtl,output_tb,user_prompt,cot_response
+nl2sva_human,multi_fifo_multi_fifo_2,gpt-4-turbo,"<CODE>
+asrt_fifo_full_to_pop: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_fifo_filled_cnt == max_fifo_entries) |-> ##[1:$] (tb_pop_cnt > 0)
+);
+</CODE>","asrt: assert property(@(posedge clk) disable iff (tb_reset)
+    (|tb_fifo_filled_cnt) |-> strong(##[0:$] |tb_pop_cnt)
+);","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: for forward progress: whenever the FIFO becomes full, an output data pop eventually happens
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property(@(posedge clk) disable iff (tb_reset)
+    (|tb_fifo_filled_cnt) |-> strong(##[0:$] |tb_pop_cnt)
+);
+
+
+asrt_fifo_full_to_pop: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_fifo_filled_cnt == max_fifo_entries) |-> ##[1:$] (tb_pop_cnt > 0)
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: for forward progress: whenever the FIFO becomes full, an output data pop eventually happens
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,multi_fifo_multi_fifo_4,gpt-4-turbo,"<CODE>
+assert_fifo_underflow: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_pop_cnt > tb_fifo_filled_cnt) |-> ##1 tb_fifo_should_not_underflow_err
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_pop_cnt > tb_fifo_filled_cnt) !== 1'b1
+);","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: that when the pop count is greater than current filled count, then FIFO goes through underflow
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_pop_cnt > tb_fifo_filled_cnt) !== 1'b1
+);
+
+
+assert_fifo_underflow: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_pop_cnt > tb_fifo_filled_cnt) |-> ##1 tb_fifo_should_not_underflow_err
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: that when the pop count is greater than current filled count, then FIFO goes through underflow
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,multi_fifo_multi_fifo_5,gpt-4-turbo,"<CODE>
+assert_fifo_filled_count: assert property (@(posedge clk) disable iff (tb_reset)
+    tb_fifo_filled_cnt <= max_fifo_entries
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_fifo_filled_cnt > max_fifo_entries) !== 1'b1
+);","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: that the filled count is less than or equal to maximum allowed entires in the FIFO
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (tb_fifo_filled_cnt > max_fifo_entries) !== 1'b1
+);
+
+
+assert_fifo_filled_count: assert property (@(posedge clk) disable iff (tb_reset)
+    tb_fifo_filled_cnt <= max_fifo_entries
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: that the filled count is less than or equal to maximum allowed entires in the FIFO
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,multi_fifo_multi_fifo_6,gpt-4-turbo,"<CODE>
+assert_fifo_no_overflow: assert property (@(posedge clk) disable iff (tb_reset)
+    !fifo_will_overflow
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    |fifo_will_overflow !== 1'b1
+);","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: that the FIFO does not experience overflow
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    |fifo_will_overflow !== 1'b1
+);
+
+
+assert_fifo_no_overflow: assert property (@(posedge clk) disable iff (tb_reset)
+    !fifo_will_overflow
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: that the FIFO does not experience overflow
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,multi_fifo_multi_fifo_7,gpt-4-turbo,"<CODE>
+asrt_write_ports_ordered: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < wr_port; i++) (wr_vld[i] |-> (&wr_vld[i-1:0]))
+);
+</CODE>","for (genvar i=1;i<wr_port;i++) begin
+    asrt: assert property (@(posedge clk) disable iff (tb_reset)
+        (wr_vld[i] && !(&wr_vld[(i-1):0])) !== 1'b1
+    );
+end","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: that write ports are properly ordered, i.e. if the ith write valid is set then all preceding write valids should all be set
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+for (genvar i=1;i<wr_port;i++) begin
+    reference: assert property (@(posedge clk) disable iff (tb_reset)
+        (wr_vld[i] && !(&wr_vld[(i-1):0])) !== 1'b1
+    );
+end
+
+
+asrt_write_ports_ordered: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < wr_port; i++) (wr_vld[i] |-> (&wr_vld[i-1:0]))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: that write ports are properly ordered, i.e. if the ith write valid is set then all preceding write valids should all be set
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,multi_fifo_multi_fifo_8,gpt-4-turbo,"<CODE>
+asrt_write_ready_order: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < wr_port; i++) (wr_ready[i] |-> (&wr_ready[i-1:0]))
+);
+</CODE>","for (genvar i=1;i<wr_port;i++) begin
+    asrt: assert property (@(posedge clk) disable iff (tb_reset)
+        (wr_ready[i] && !(&wr_ready[(i-1):0])) !== 1'b1
+    );
+end","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: that write ports are properly ordered, i.e. if the ith write ready is set then all preceding write ready signals should all be set
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+for (genvar i=1;i<wr_port;i++) begin
+    reference: assert property (@(posedge clk) disable iff (tb_reset)
+        (wr_ready[i] && !(&wr_ready[(i-1):0])) !== 1'b1
+    );
+end
+
+
+asrt_write_ready_order: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < wr_port; i++) (wr_ready[i] |-> (&wr_ready[i-1:0]))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: that write ports are properly ordered, i.e. if the ith write ready is set then all preceding write ready signals should all be set
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,multi_fifo_multi_fifo_9,gpt-4-turbo,"<CODE>
+asrt_read_order: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < rd_port; i++) (rd_vld[i] |-> &rd_vld[i-1:0])
+);
+</CODE>","for (genvar i=1;i<rd_port;i++) begin
+    asrt: assert property (@(posedge clk) disable iff (tb_reset)
+        (rd_vld[i] && !(&rd_vld[(i-1):0])) !== 1'b1
+    );
+end","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: that read ports are properly ordered, i.e. if the ith read valid is set then all preceding read valids should all be set
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+for (genvar i=1;i<rd_port;i++) begin
+    reference: assert property (@(posedge clk) disable iff (tb_reset)
+        (rd_vld[i] && !(&rd_vld[(i-1):0])) !== 1'b1
+    );
+end
+
+
+asrt_read_order: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < rd_port; i++) (rd_vld[i] |-> &rd_vld[i-1:0])
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: that read ports are properly ordered, i.e. if the ith read valid is set then all preceding read valids should all be set
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,multi_fifo_multi_fifo_10,gpt-4-turbo,"<CODE>
+asrt_read_ready_order: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < rd_port; i++) (rd_ready[i] |-> (&rd_ready[i-1:0]))
+);
+</CODE>","for (genvar i=1;i<rd_port;i++) begin
+    asrt: assert property (@(posedge clk) disable iff (tb_reset)
+        (rd_ready[i] && !(&rd_ready[(i-1):0])) !== 1'b1
+    );
+end","
+","module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+
+
+
+//Question: Create a SVA assertion that checks: that read ports are properly ordered, i.e. if the ith read ready is set then all preceding read ready signals should all be set
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+for (genvar i=1;i<rd_port;i++) begin
+    reference: assert property (@(posedge clk) disable iff (tb_reset)
+        (rd_ready[i] && !(&rd_ready[(i-1):0])) !== 1'b1
+    );
+end
+
+
+asrt_read_ready_order: assert property (@(posedge clk) disable iff (tb_reset)
+    forall (int i = 1; i < rd_port; i++) (rd_ready[i] |-> (&rd_ready[i-1:0]))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module multi_fifo_tb (
+clk,
+reset_,
+wr_vld,
+wr_data,
+wr_ready,
+rd_vld,
+rd_data,
+rd_ready
+);
+
+    parameter   max_fifo_entries = 4;
+    parameter   wr_port = 1;
+    parameter   rd_port = 1;
+    parameter   data_width = 1;
+
+    localparam fifo_entry_cntr = $clog2(max_fifo_entries +1 );
+    localparam wr_port_log2 = $clog2(wr_port +1 );
+    localparam rand_bit_selector = $clog2(data_width);
+
+
+input clk;
+input reset_;
+input [(wr_port)-1:0] wr_vld;
+input [(data_width * wr_port)-1:0] wr_data;
+input [(wr_port)-1:0] wr_ready;
+input [(rd_port)-1:0] rd_vld;
+input [(data_width * rd_port)-1:0] rd_data;
+input [(rd_port)-1:0] rd_ready;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+reg [(fifo_entry_cntr-1):0] tb_wr_ptr;
+reg [(fifo_entry_cntr-1):0] tb_rd_ptr;
+
+reg [(wr_port - 1):0] tb_wr_data_for_fv;
+reg [(rd_port - 1):0] tb_rd_data_for_fv;
+
+reg [data_width-1:0]tb_wr_data_for_sim[(wr_port - 1):0];
+reg [data_width-1:0]tb_rd_data_for_sim[(rd_port - 1):0];
+
+
+
+wire [rd_port-1:0] tb_rd_data_is_correct_in_sim_err;
+wire tb_fifo_should_not_underflow_err;
+wire tb_filled_cnt_less_or_equal_max_entries_err;
+wire tb_fifo_should_not_overflow_err;
+wire [wr_port-1:0] tb_wr_vld_is_contiguous_err;
+wire [wr_port-1:0] tb_wr_ready_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_vld_is_contiguous_err;
+wire [rd_port-1:0] tb_rd_ready_is_contiguous_err;
+
+
+wire [rand_bit_selector-1:0] tb_random_1_bit_data_selector[wr_port-1:0]; 
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_fv
+    always_comb
+    begin
+        tb_wr_data_for_fv[i] = wr_data[(i*data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_fv
+    always_comb
+    begin
+        tb_rd_data_for_fv[i] = rd_data[(i * data_width) + tb_random_1_bit_data_selector[i]];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<wr_port; i++) begin : abstract_write_data_for_sim
+    always_comb
+    begin
+        tb_wr_data_for_sim[i] = wr_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+generate
+for (genvar i=0; i<rd_port; i++) begin : abstract_read_data_for_sim
+    always_comb
+    begin
+        tb_rd_data_for_sim[i] = rd_data[((i+1)*data_width)-1 : (i*data_width)];
+    end
+end
+endgenerate
+
+wire [(fifo_entry_cntr-1):0] tb_pop_cnt  = $countones(rd_vld & rd_ready);
+wire [(fifo_entry_cntr-1):0] tb_push_cnt = $countones(wr_vld & wr_ready);
+wire [(fifo_entry_cntr-1):0] tb_fifo_filled_cnt = tb_wr_ptr - tb_rd_ptr;
+
+wire fifo_will_overflow   = (tb_fifo_filled_cnt + tb_push_cnt - tb_pop_cnt) > max_fifo_entries;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        tb_wr_ptr <= 0;
+        tb_rd_ptr <= 0;
+    end else begin
+        tb_wr_ptr <= tb_wr_ptr + tb_push_cnt; // wr_ptr always move when write
+        if (fifo_will_overflow) begin
+        tb_rd_ptr <= tb_wr_ptr + tb_push_cnt - max_fifo_entries;  // overflow will push rd_ptr
+        end else begin
+        tb_rd_ptr <= tb_rd_ptr + tb_pop_cnt;  // when not overflow, rd_ptr moves when fifo read
+        end
+    end
+end
+
+reg registered_data;
+reg [(fifo_entry_cntr-1):0] registered_ptr;
+reg [(wr_port)-1:0] registered_data_next;
+reg [(wr_port)-1:0] registered_data_update;
+
+reg [rand_bit_selector-1:0] tb_random_bit_selector_next[wr_port-1:0];
+reg [rand_bit_selector-1:0] tb_random_1_bit_data_selector_registered;
+
+always @(posedge clk)
+begin
+    if (!reset_) begin
+        registered_ptr <= 'x;                 // registered_ptr is random during reset
+    end else begin
+        registered_ptr <= registered_ptr;     // else it retiains its value
+    end
+end
+
+// when wr_ptr == registered_ptr, register data
+generate
+for (genvar i=0; i<wr_port; i++) begin:register_write_data
+    always_comb
+    begin
+        registered_data_next[i] = 0;
+        registered_data_update[i] = 0;
+        tb_random_bit_selector_next[i] = 0;
+        if (wr_vld[i] && ((tb_wr_ptr + i[(fifo_entry_cntr-1):0]) == registered_ptr)) begin
+            registered_data_update[i] = 1;
+            registered_data_next[i] = tb_wr_data_for_fv[i];
+            tb_random_bit_selector_next[i] = tb_random_1_bit_data_selector[i];
+        end
+    end
+end
+endgenerate
+
+// register selector
+reg [wr_port_log2-1:0] wr_index;
+reg [rand_bit_selector-1:0] tb_random_bit_next;
+always_comb begin
+    tb_random_bit_next = 0;
+    for (wr_index=0; wr_index < wr_port; wr_index++) begin
+        if (registered_data_update[wr_index]) begin
+            tb_random_bit_next = tb_random_bit_selector_next[wr_index];
+        end
+    end
+end
+
+// register data
+always @ (posedge clk)
+begin
+    if (|registered_data_update) begin
+        registered_data <= |registered_data_next;
+        tb_random_1_bit_data_selector_registered <= tb_random_bit_next;
+    end
+end
+
+reg [data_width-1:0]fifo_data_tracker [(max_fifo_entries+wr_port-1):0];
+reg [data_width-1:0]fifo_data_tracker_next [(max_fifo_entries+wr_port-1):0];
+reg [(fifo_entry_cntr-1):0] tb_shift;
+
+reg [(fifo_entry_cntr-1):0] n;
+always @ (posedge clk)
+begin
+if (tb_shift == 0) 
+    for (n=0; n < max_fifo_entries; n++) begin
+        fifo_data_tracker[n] <= fifo_data_tracker_next[n];
+    end
+else if (tb_shift > (max_fifo_entries+wr_port-1)) begin
+  for (n=0; n < max_fifo_entries;n++) fifo_data_tracker[n][data_width-1:0] <= 0;
+end else begin
+    for (n=0; n<max_fifo_entries; n++) begin 
+        if ((tb_shift+n) <= (max_fifo_entries+wr_port-1)) begin
+          fifo_data_tracker[n] <= fifo_data_tracker_next[n+tb_shift];
+        end
+    end  
+end
+end     
+
+generate
+for (genvar i=0; i<(max_fifo_entries+wr_port); i++) begin:assign_data_tracker_next
+    always_comb
+    begin
+        if (i<tb_fifo_filled_cnt) begin
+        fifo_data_tracker_next[i] = fifo_data_tracker[i];           // assign kept data
+        end
+        else if (i <tb_fifo_filled_cnt + wr_port) begin
+        fifo_data_tracker_next[i] = tb_wr_data_for_sim[i-tb_fifo_filled_cnt];  // assign new written data
+        end
+        // else dont care
+    end
+end
+endgenerate
+
+always_comb
+begin
+    if (fifo_will_overflow) begin
+        tb_shift = tb_push_cnt + tb_fifo_filled_cnt - max_fifo_entries;
+    end else begin
+        tb_shift = tb_pop_cnt;
+    end
+end
+
+endmodule
+
+Question: Create a SVA assertion that checks: that read ports are properly ordered, i.e. if the ith read ready is set then all preceding read ready signals should all be set
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,ram_ram_0,gpt-4-turbo,"<CODE>
+asrt_read_address_valid: assert property (@(posedge clk) disable iff (tb_reset)
+    (re -> (ra < entries))
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (re |-> ra < entries)
+);","
+","module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+
+
+
+//Question: Create a SVA assertion that checks: read address is not greater than number of entries i.e. the read address is not pointing to an address not in the memory
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (re |-> ra < entries)
+);
+
+
+asrt_read_address_valid: assert property (@(posedge clk) disable iff (tb_reset)
+    (re -> (ra < entries))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+endmodule
+
+Question: Create a SVA assertion that checks: read address is not greater than number of entries i.e. the read address is not pointing to an address not in the memory
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,ram_ram_1,gpt-4-turbo,"<CODE>
+asrt_write_address_valid: assert property (@(posedge clk) disable iff (tb_reset)
+    (we -> (wa < entries))
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (we |-> wa < entries)
+);","
+","module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+
+
+
+//Question: Create a SVA assertion that checks: write address is not greater than number of entries i.e. the write address is not pointing to an address not in the memory
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (we |-> wa < entries)
+);
+
+
+asrt_write_address_valid: assert property (@(posedge clk) disable iff (tb_reset)
+    (we -> (wa < entries))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+endmodule
+
+Question: Create a SVA assertion that checks: write address is not greater than number of entries i.e. the write address is not pointing to an address not in the memory
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,ram_ram_2,gpt-4-turbo,"<CODE>
+assert_no_write_through_violation: assert property (@(posedge clk) disable iff (tb_reset)
+    !(we && re && (wa == ra))
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (we && re |-> !(wa == ra))
+);","
+","module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+
+
+
+//Question: Create a SVA assertion that checks: write through violation, where   a read from and a write to thesame address happen in same cycle, does not occur
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (we && re |-> !(wa == ra))
+);
+
+
+assert_no_write_through_violation: assert property (@(posedge clk) disable iff (tb_reset)
+    !(we && re && (wa == ra))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+endmodule
+
+Question: Create a SVA assertion that checks: write through violation, where   a read from and a write to thesame address happen in same cycle, does not occur
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,ram_ram_3,gpt-4-turbo,"<CODE>
+asrt_write_after_write: assert property (@(posedge clk) disable iff (tb_reset)
+    !(addr_aw_seen && we && (wa == symbolic_constant_a))
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+     (addr_aw_seen |-> !(we && (wa == symbolic_constant_a)))
+);","
+","module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+
+
+
+//Question: Create a SVA assertion that checks: write after write cases, where writes to the same address happen before a read, does not occur
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+     (addr_aw_seen |-> !(we && (wa == symbolic_constant_a)))
+);
+
+
+asrt_write_after_write: assert property (@(posedge clk) disable iff (tb_reset)
+    !(addr_aw_seen && we && (wa == symbolic_constant_a))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+endmodule
+
+Question: Create a SVA assertion that checks: write after write cases, where writes to the same address happen before a read, does not occur
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,ram_ram_4,gpt-4-turbo,"<CODE>
+asrt_read_after_read: assert property (@(posedge clk) disable iff (tb_reset)
+    !(addr_ar_seen && re && (ra == symbolic_constant_a))
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (addr_ar_seen |-> !(re && (ra == symbolic_constant_a)))
+);","
+","module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+
+
+
+//Question: Create a SVA assertion that checks: read after read cases, where read to the same address happen before a write, does not occur
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (addr_ar_seen |-> !(re && (ra == symbolic_constant_a)))
+);
+
+
+asrt_read_after_read: assert property (@(posedge clk) disable iff (tb_reset)
+    !(addr_ar_seen && re && (ra == symbolic_constant_a))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+endmodule
+
+Question: Create a SVA assertion that checks: read after read cases, where read to the same address happen before a write, does not occur
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,ram_ram_5,gpt-4-turbo,"<CODE>
+asrt_read_before_write: assert property (@(posedge clk) disable iff (tb_reset)
+    !(addr_ar_seen && !addr_aw_seen && (ra == symbolic_constant_a))
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (!addr_first_aw_seen |-> !(re && (ra == symbolic_constant_a)))
+);","
+","module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+
+
+
+//Question: Create a SVA assertion that checks: read before write cases, where read to the same address happen before a write, does not occur
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (!addr_first_aw_seen |-> !(re && (ra == symbolic_constant_a)))
+);
+
+
+asrt_read_before_write: assert property (@(posedge clk) disable iff (tb_reset)
+    !(addr_ar_seen && !addr_aw_seen && (ra == symbolic_constant_a))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+endmodule
+
+Question: Create a SVA assertion that checks: read before write cases, where read to the same address happen before a write, does not occur
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
+nl2sva_human,ram_ram_6,gpt-4-turbo,"<CODE>
+asrt_max_latency: assert property (@(posedge clk) disable iff (tb_reset)
+    (addr_aw_seen && !$past(addr_ar_seen, wr_latency) && re && (ra == symbolic_constant_a)) |-> ##[1:wr_latency] (addr_ar_seen && (ra == symbolic_constant_a))
+);
+</CODE>","asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (latency_cnt <= wr_latency)
+);","
+","module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+
+
+
+//Question: Create a SVA assertion that checks: max latency between a write and following read is within the specified write-read latency threshold
+//
+//Do not add code to output an error message string.
+//Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+//
+//Answer:
+//
+
+reference: assert property (@(posedge clk) disable iff (tb_reset)
+    (latency_cnt <= wr_latency)
+);
+
+
+asrt_max_latency: assert property (@(posedge clk) disable iff (tb_reset)
+    (addr_aw_seen && !$past(addr_ar_seen, wr_latency) && re && (ra == symbolic_constant_a)) |-> ##[1:wr_latency] (addr_ar_seen && (ra == symbolic_constant_a))
+);
+
+
+endmodule","As an example, consider the following SystemVerilog module:
+
+module ShiftRegister #(
+  parameter Width = 4
+) (
+  input  logic             clk,
+  input  logic             reset_,
+  input  logic             shiftRight,
+  input  logic             writeEnable,
+  input  logic [Width-1:0] dataIn,
+  output logic [Width-1:0] dataOut
+);
+
+  logic [Width-1:0] shiftRegisters;
+  logic [Width-1:0] shiftRegisters_delay1;
+
+  logic tb_reset = (reset_ == 1'b0)
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters <= '0;
+    end
+    else if (writeEnable) begin
+        shiftRegisters <= dataIn;
+    end
+    else if (shiftRight) begin
+      shiftRegisters <= {shiftRegisters[0], shiftRegisters[Width-1:1]};
+    end
+    else begin
+      shiftRegisters <= {shiftRegisters[Width-2:0], shiftRegisters[Width-1]};
+    end
+  end
+  always_ff @(posedge clk, negedge reset_) begin
+    if (!reset_) begin
+      shiftRegisters_delay1 <= '0;
+    end
+    else begin
+      shiftRegisters_delay1 <= shiftRegisters;
+    end
+  end
+  assign dataOut = shiftRegisters;
+  
+
+endmodule
+
+Here are examples of assertions about this design.
+
+Question: Create a SVA assertion that checks that in the same cycle that data input is written, the output matches the input.
+
+Answer:
+<CODE>
+asrt: assert property (@(posedge clk) disable iff (tb_reset)
+    (writeEnable && (dataIn != dataOut) !== 1'b1)
+);
+</CODE>
+
+
+Now here is the testbench to perform your translation:
+
+module ram_tb (clk, reset_, we, wa, wd, re, ra, rd, stall);
+
+  
+    parameter   addr_width = 1;
+    parameter   data_width = 1;
+    parameter   entries = 1;
+    parameter   wr_latency=0;                   //checks max latency between a write to read. wr_latency=0 means disable this check
+
+
+parameter tb_max_length_width = $clog2(wr_latency);
+
+input    clk,reset_;
+input    we,re;
+input [addr_width-1:0] wa,ra;
+input [data_width-1:0] wd,rd;
+input    stall;
+
+wire tb_reset;
+assign tb_reset = (reset_ == 1'b0);
+
+
+wire [addr_width-1:0] symbolic_constant_a;
+asum_tb_ram__constant_addr_a : assume property (@(posedge clk) disable iff (tb_reset)
+  ($stable(symbolic_constant_a))
+);
+
+reg addr_ar_seen;
+reg addr_aw_seen;
+reg addr_first_aw_seen;
+reg [tb_max_length_width-1:0]  latency_cnt;       //max latency is wr_latency       
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd1;    
+  end else if (re && (ra == symbolic_constant_a)) begin
+    addr_aw_seen <= 1'd0;    
+  end
+end
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_ar_seen <= 1'd0;
+  end else if (we && (re == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd1;    
+  end else if (re && (we == symbolic_constant_a)) begin
+    addr_ar_seen <= 1'd0;    
+  end
+end
+
+always @(posedge clk) begin
+  if(!reset_) begin
+    addr_first_aw_seen <= 1'd0;
+  end else if (we && (wa == symbolic_constant_a)) begin
+    addr_first_aw_seen <= 1'd1;
+  end
+end
+
+always @(posedge clk) begin
+    latency_cnt <= (we && wa == symbolic_constant_a) ? 16'd1 : (re && ra == symbolic_constant_a) ? 16'd0 : (latency_cnt>0) ? (latency_cnt+(!stall)) : latency_cnt;
+end
+
+
+endmodule
+
+Question: Create a SVA assertion that checks: max latency between a write and following read is within the specified write-read latency threshold
+
+Do not add code to output an error message string.
+Enclose your SVA code with <CODE> and </CODE>. Only output the code snippet and do NOT output anything else.
+
+Answer:
+","cot_response
+"
