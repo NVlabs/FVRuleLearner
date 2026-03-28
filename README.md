@@ -65,5 +65,5 @@ Evaluation is handled within the framework based on the `global_task` setting in
 
 ## Licenses
 
-Copyright © 2024, NVIDIA Corporation. All rights reserved.
-This work is made available under the Apache 2.0 License.
+Copyright © 2026, NVIDIA Corporation. All rights reserved.
+This work is made available under the NVIDIA License.
