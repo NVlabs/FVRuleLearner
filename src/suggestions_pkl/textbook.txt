@@ -1,0 +1,260 @@
+Chapter 1: Fundamental Principles of SystemVerilog Assertions
+Introduction
+This chapter covers the basic principles and best practices for writing SystemVerilog assertions (SVA). Understanding these fundamentals is crucial for creating accurate and maintainable assertions.
+1.1 Direct Translation
+•	Rule: Always translate natural language requirements directly into assertions without adding extra logic or assumptions
+•	Rule: Focus on specific conditions mentioned in requirements rather than inferring additional constraints
+Example:
+```systemverilog
+// Requirement: "Check if signal 'valid' is high when 'ready' is asserted"
+// Good:
+assert property (@(posedge clk) ready |-> valid);
+// Bad - adds assumptions:
+assert property (@(posedge clk) ready |-> valid && !reset && stable);
+```
+1.2 Signal Usage
+•	Rule: Use exact signal names mentioned in requirements
+•	Rule: Avoid introducing new signals not specified in requirements
+•	Rule: When specific signal values are mentioned (e.g., 'd0), include them exactly as specified
+Example:
+```systemverilog
+// Requirement: "Check if 'count' equals zero"
+// Good:
+assert property (@(posedge clk) count == 'd0);
+// Bad - introduces new signal:
+assert property (@(posedge clk) count == 'd0 && valid);
+```
+1.3 Array and Vector Indexing
+• Rule: Pay careful attention to array and vector indexing in assertions
+• Rule: Use specific array indices when they are mentioned in requirements
+• Rule: Verify correct index usage when dealing with multi-dimensional signals
+Example:
+```systemverilog
+// Good - specific index used:
+assert property (@(posedge clk) !(|(match_tracker[0])));
+// Bad - missing index:
+assert property (@(posedge clk) |match_tracker);
+```
+1.4 Direct Condition Translation
+•	Rule: When translating conditions that represent absence (e.g., "no grants"), use direct equality comparisons rather than derived expressions 
+•	Rule: When a signal is mentioned by name in requirements, use it directly rather than deriving or transforming it 
+•	Rule: Do not rewrite conditions using implications when the requirement specifies a direct state check 
+•	Rule: Avoid deriving new signals or values (like using $clog2 or NUM_OF_CLIENTS) unless explicitly required 
+•	Rule: When negating conditions, use direct comparisons (!=, !==) rather than complex functions or implications 
+•	Rule: Express the absence of something using direct equality (== 0) rather than functions like $countones
+Example: 
+```systemverilog
+// Requirement: "Check that there are no grants and grant ID is valid"
+// Good - direct translation:
+assert property (@(posedge clk) disable iff (reset)
+    ((tb_gnt == 0) && (gnt_id != 0)) !== 1'b1
+);
+// Bad - uses complex functions and derived values:
+assert property (@(posedge clk) disable iff (reset)
+    !$countones(tb_gnt) |=> (gnt_id == $clog2(NUM_OF_CLIENTS)'(tb_gnt))
+);
+// Bad - uses implication when direct check is needed:
+assert property (@(posedge clk) disable iff (reset)
+    no_grants |=> proper_gnt_id
+);
+```
+1.5 Condition Complexity
+•	Rule: Prefer explicit signal values over derived calculations
+•	Rule: Use direct comparisons (==, !=) rather than reduction operations when checking for zero/non-zero values
+•	Rule: Avoid using implication operators (|=>, |->) when simple logical operators (&&, ||) can express the same condition
+•	Rule: Express conditions in their simplest form without unnecessary transformations
+•	Rule: When checking for invalid conditions, use !== 1'b1 with the exact condition rather than complex logical combinations
+Example:
+```systemverilog
+// Requirement: "Verify signal is zero"
+// Good - direct comparison:
+assert property (@(posedge clk)
+    (signal == 0)
+);
+// Bad - uses reduction and complex logic:
+assert property (@(posedge clk)
+    !$countones(signal) |=> condition
+);
+```
+Chapter 2: Logical Operators and Expressions
+Introduction
+This chapter focuses on the proper use of logical operators in SystemVerilog assertions and how to structure assertion expressions effectively.
+2.1 Operator Selection
+•	Rule: Prefer simple logical operators (&&, ||, !=) over complex ones when possible
+•	Rule: Use !==1'b1 for negations instead of ! operator when checking conditions
+Example:
+```systemverilog
+// Requirement: "Check that signals a and b are not both high"
+// Good:
+assert property (@(posedge clk) (a && b) !== 1'b1);
+// Bad:
+assert property (@(posedge clk) !(a && b));
+```
+2.2 Implication Operators
+•	Rule: Avoid using implication operators (|=>, |->) unless explicitly needed
+•	Rule: Consider rewriting implications using simple logical operators
+Example:
+```systemverilog
+// Requirement: "When req is high, grant must be high"
+// Good:
+assert property (@(posedge clk) (req && !grant) !== 1'b1);
+// Alternative with implication:
+assert property (@(posedge clk) req |-> grant);
+```
+Chapter 3: Temporal Properties
+Introduction
+This chapter covers how to properly specify and use temporal relationships in assertions.
+3.1 Sequence Specification
+•	Rule: Use ##[0:$] instead of ##[1:$] to include current clock cycle
+•	Rule: Use 'strong' keyword for temporal properties when appropriate
+Example:
+```systemverilog
+// Requirement: "After req, grant must eventually be asserted"
+// Good:
+assert property (@(posedge clk) req |-> strong(##[0:$] grant));
+// Bad:
+assert property (@(posedge clk) req |=> ##[1:$] grant);
+```
+3.2 Clock and Reset Handling
+•	Rule: Always use proper clock edge specification
+•	Rule: Use disable iff for reset conditions correctly
+Example:
+```systemverilog
+// Good:
+assert property (@(posedge clk) disable iff (reset) condition);
+// Bad - missing reset handling:
+assert property (@(posedge clk) condition);
+```
+Chapter 4: Combinational Logic in Assertions
+Introduction
+This chapter discusses how to effectively use combinational logic in assertions.
+4.1 Bitwise Operations
+•	Rule: Use correct bitwise operators (|, &, ^) when dealing with multi-bit signals
+•	Rule: Be precise with bit selections and indexing
+Example:
+```systemverilog
+// Requirement: "Check if any bit in vector is set"
+// Good:
+assert property (@(posedge clk) |vector !== 1'b1);
+// Bad:
+assert property (@(posedge clk) vector != 0);
+```
+4.2 Multiple Conditions
+•	Rule: Break down complex conditions into simpler sub-expressions
+•	Rule: Use parentheses to clarify operation order
+Example:
+```systemverilog
+// Good:
+assert property (@(posedge clk) (condA && condB) || (condC && condD));
+// Bad - unclear precedence:
+assert property (@(posedge clk) condA && condB || condC && condD);
+```
+Chapter 5: Edge Cases and Corner Conditions
+Introduction
+This chapter focuses on handling special cases and boundary conditions in assertions.
+5.1 Boundary Values
+•	Rule: Include explicit checks for boundary values
+•	Rule: Handle reset and initialization conditions properly
+Example:
+```systemverilog
+// Requirement: "Check counter doesn't overflow"
+// Good:
+assert property (@(posedge clk) (count == MAX && increment) !== 1'b1);
+// Bad:
+assert property (@(posedge clk) count < MAX);
+```
+Chapter 6: State Machine Assertions
+Introduction
+This chapter covers assertions related to state machines and sequential behavior.
+6.1 State Transitions
+•	Rule: Use exact state values in comparisons
+•	Rule: Consider all relevant state combinations
+Example:
+```systemverilog
+// Good:
+assert property (@(posedge clk) 
+    (state == 2'd2 && next_state == 2'd1) !== 1'b1);
+```
+Chapter 7: Data Consistency
+Introduction
+This chapter focuses on checking data consistency across different parts of the design.
+7.1 FIFO Operations
+•	Rule: Check data consistency between input and output
+•	Rule: Verify proper handling of empty and full conditions
+Example:
+```systemverilog
+// Good:
+assert property (@(posedge clk) 
+    (fifo_empty && pop) !== 1'b1);
+```
+Chapter 8: Advanced Assertion Techniques
+Introduction
+This chapter covers advanced topics and special considerations in assertion writing.
+8.1 Complex Protocol Verification
+•	Rule: Break down complex protocol checks into multiple simpler assertions
+•	Rule: Use appropriate combination of temporal and logical operators
+Example:
+```systemverilog
+// Good:
+assert property (@(posedge clk) 
+    (valid && !ready && stable) |-> strong(##[0:$] ack));
+```
+Chapter 9: Assertion Patterns
+Introduction This chapter presents common patterns for writing assertions in specific scenarios.
+9.1 Resource Arbitration
+•	Rule: Check for conflicting resource access using !== 1'b1 
+•	Rule: Verify grant signals are not asserted during busy conditions 
+•	Rule: Use $onehot0 function to check for mutual exclusion of signals 
+•	Rule: When checking multiple conditions that should not occur simultaneously, prefer $onehot0 over complex logical expressionsExample:
+```systemverilog
+// Good - using $onehot0 for mutual exclusion:
+assert property (@(posedge clk) disable iff (reset)
+    !$onehot0({hold,busy,cont_gnt}) !== 1'b1
+);
+// Less preferred - using complex logical expressions:
+assert property (@(posedge clk) disable iff (reset)
+    !(hold && busy && cont_gnt)
+);
+```
+9.2 Signal Comparison and State Tracking
+•	Rule: When comparing signals against past values, use dedicated storage (e.g., last_gnt) instead of $past where possible 
+•	Rule: Consider all relevant signals mentioned in requirements, even if not explicitly used in main condition 
+•	Rule: Pay attention to vector reduction operations and their implications 
+•	Rule: Be explicit about signal equality comparisons using == 0 rather than just reduction operations
+Example:
+```systemverilog
+// Good - using explicit storage:
+assert property (@(posedge clk) disable iff (reset)
+    (hold && !busy && (tb_gnt != last_gnt)) !== 1'b1
+);
+// Less preferred - using $past:
+assert property (@(posedge clk) disable iff (reset)
+    hold |=> tb_gnt == $past(tb_gnt)
+);
+```
+9.3 FIFO Operations
+•	Rule: Use strong temporal assertions for eventual conditions
+•	Rule: Include ##[0:$] range to check from current cycle onwards 
+Example:
+```systemverilog
+// Good:
+assert property (@(posedge clk) disable iff (reset)
+    !fifo_empty |-> strong(##[0:$] rd_pop)
+);
+```
+9.4 State Machine Validation
+•	Rule: Use precise bit selection for state vectors 
+•	Rule: Consider array indexing when working with state trackers 
+•	Rule: When validating state transitions, include all relevant preconditions 
+•	Rule: Use vector comparisons instead of multiple single-bit comparisons when possible
+Example:
+```systemverilog
+// Good - includes preconditions and proper indexing:
+assert property (@(posedge clk) disable iff (reset)
+    (check_state_legal_precondition && !(|(match_tracker[0]))) !== 1'b1
+);
+// Less preferred - missing preconditions:
+assert property (@(posedge clk) disable iff (reset)
+    !(|(match_tracker[0]))
+);
+```
