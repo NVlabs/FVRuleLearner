@@ -59,7 +59,7 @@ export CDS_LIC_FILE=5280@cadence.webstore.illinois.edu
 Run from the repo root:
 
 ```bash
-cd /home/jiaxin/Documents/FVRuleLearner
+cd FVRuleLearner
 ```
 
 The main entrypoint is:
@@ -145,7 +145,7 @@ llm_model = "gpt-4o"
 
 use_RAG = True
 RAG_content = ["Examples", "Suggestions"]
-load_suggestions_path = "/absolute/path/to/src/logs/train_<...>"
+load_suggestions_path = "src/logs/train_<...>"
 ```
 
 Recommended inference settings for the current mainline are:
@@ -214,7 +214,7 @@ If you already have an inference output folder and only want to re-run postproce
 ```python
 global_task = "eval"
 task = "nl2sva_opencore"
-folder_to_eval = "/absolute/path/to/src/logs/inference_<...>"
+folder_to_eval = "src/logs/inference_<...>"
 ```
 
 Then run:
