@@ -148,7 +148,7 @@ RAG_content = ["Examples", "Suggestions"]
 load_suggestions_path = "/absolute/path/to/src/logs/train_<...>"
 ```
 
-For the current mainline, the inference settings that were used successfully are:
+Recommended inference settings for the current mainline are:
 
 ```python
 similarity_str = ["Question"]
@@ -157,7 +157,7 @@ Examples_top_k = 1
 prompting_instruction = 0
 
 Suggestions_top_k = 3
-Suggestions_Reasoning = False
+Suggestions_Reasoning = True
 
 use_qtree_inference = True
 retrieval_on_ranking = True
@@ -166,7 +166,7 @@ qtree_ranking_mode = "prompt"
 rule_source = "generate"
 
 deduplication = True
-operator_explanation = False
+operator_explanation = True
 filter_functionality = True
 ```
 
