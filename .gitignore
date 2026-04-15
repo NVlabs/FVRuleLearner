@@ -1,0 +1,41 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Notebook cache
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Local logs and temp outputs
+logs/
+coding/
+src/logs/
+src/coding/
+*.log
+
+# Generated experiment outputs
+results_nl2sva_human/
+results_nl2sva_machine/
+FVEval/tmp_nl2sva_machine/
+FVEval/tmp_nl2sva_opencore/
+
+# Local paper artifacts
+paper/
+
+# Local Jasper artifacts
+Jasper/

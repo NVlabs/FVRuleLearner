@@ -1,4 +1,19 @@
-from config import FLAGS, load_perflab_config
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+from config import FLAGS
 import time
 import sqlite3
 # from transformers import AutoTokenizer
@@ -13,12 +28,11 @@ from pathlib import Path
 from FVEval.fv_eval import utils as utils2
 from langchain.schema import HumanMessage
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-# from adlrchat.langchain import ADLRChat
-from openai import AzureOpenAI
+from openai import AzureOpenAI, OpenAI
 from openai import APITimeoutError, APIError, APIConnectionError, InternalServerError
+import anthropic
 from tenacity import retry, retry_if_exception_type, wait_exponential, stop_after_attempt
 from hardware_agent.basic_client import BasicClient
-from autogen import config_list_from_json
 
 # Color codes for terminal output
 CYAN = "\033[96m"
@@ -28,12 +42,14 @@ YELLOW = "\033[93m"
 RESET = "\033[0m"
 
 print = saver.log_info
-
-from autogen.agentchat.chat import ChatResult
 import tiktoken
 
 class RateLimitError(Exception):
     pass
+
+
+def is_direct_llm_gateway(gateway_name):
+    return gateway_name in {"openai", "claude"}
 
 def check_and_fix_cache(cache_dir=".cache"):
     """
@@ -231,7 +247,7 @@ def initiate_chat_with_retry_legacy(agent_user, agent_coding, message, retries, 
 
 
 def initiate_chat_with_retry(agent_user, agent_coding, message=None, retries=FLAGS.GPT_retries, backoff_factor=2,
-                             model="fvmixtral_8x7b_0802_steer_delta",
+                             model=None,
                              prepare_env_args={"SERVER_COOLNAME": "aromatic-partridge"},
                              temperature=0.0,
                              stop=["extra_id_1"],
@@ -239,8 +255,8 @@ def initiate_chat_with_retry(agent_user, agent_coding, message=None, retries=FLA
                              streaming=True,
                              **kwargs):
     """
-    A wrapper function that can either use the original legacy approach (via initiate_chat_with_retry_legacy)
-    or the new ADLRChat approach, based on the `use_new_method` flag.
+    A wrapper function that can either use the original legacy approach
+    or a direct OpenAI-compatible gateway call.
     """
     
     if not message:
@@ -249,11 +265,10 @@ def initiate_chat_with_retry(agent_user, agent_coding, message=None, retries=FLA
         raise ValueError("Message must be provided either as a parameter or in kwargs.")
 
     # Determine which method to use
-    use_new_method = hasattr(FLAGS, 'baseline_finetune') and FLAGS.baseline_finetune
-    use_mark_perflab = hasattr(FLAGS, 'LLM_gateaway') and FLAGS.LLM_gateaway in ['Mark', 'perflab']
+    use_direct_llm = hasattr(FLAGS, 'LLM_gateaway') and is_direct_llm_gateway(FLAGS.LLM_gateaway)
     # breakpoint()
     
-    if use_mark_perflab:
+    if use_direct_llm:
         
         # Try multiple locations where system message might be stored
         system_prompt = agent_coding.system_message
@@ -275,10 +290,10 @@ def initiate_chat_with_retry(agent_user, agent_coding, message=None, retries=FLA
         if not hasattr(agent_user, 'stats'):
             agent_user.stats = {'runtime': [], 'tokens': []}
         
-        # Implement retry logic for Mark/perflab gateways
+        # Implement retry logic for the direct OpenAI gateway
         for attempt in range(retries):
             try:
-                # Use llm_inference for Mark/perflab gateways
+                # Use llm_inference for direct gateways
                 response_str = llm_inference(system_prompt, message, temperature=temperature, model=effective_model)
                 return response_str
                 
@@ -299,54 +314,7 @@ def initiate_chat_with_retry(agent_user, agent_coding, message=None, retries=FLA
                     raise
         
         # If we reach here, no response after retries
-        raise RuntimeError("Failed to get a response after all retries using Mark/perflab gateway.")
-    
-    elif use_new_method:
-        # Using the new ADLRChat invocation
-        # if callbacks is None:
-        #     callbacks = [StreamingStdOutCallbackHandler()]
-
-        # # Initialize statistics dictionary if not already done
-        # if not hasattr(agent_user, 'stats'):
-        #     agent_user.stats = {'runtime': [], 'tokens': []}
-        
-        # tokenizer = get_tokenizer(FLAGS.llm_model)
-
-        # for attempt in range(retries):
-        #     start_time = time.time()
-        #     try:
-        #         chat_instance = ADLRChat(
-        #             streaming=streaming,
-        #             callbacks=callbacks,
-        #             temperature=temperature,
-        #             model=model,
-        #             stop=stop,
-        #             prepare_env_args=prepare_env_args
-        #         )
-        #         response = chat_instance.invoke([HumanMessage(content=message)])
-        #         response_str = response.content if hasattr(response, 'content') else str(response)
-
-        #         LLM_runtime = time.time() - start_time
-        #         tokens = count_tokens(tokenizer, message)
-
-        #         # Save stats
-        #         saver.save_stats('LLM_runtime', LLM_runtime)
-        #         saver.save_stats('tokens', tokens)
-
-        #         return response_str
-
-        #     except RateLimitError as e:
-        #         wait_time = backoff_factor ** attempt
-        #         print(f"@@@{FLAGS.llm_model}: Rate limit exceeded. Retrying in {wait_time} seconds...")
-        #         time.sleep(wait_time)
-        #     except Exception as e:
-        #         wait_time = backoff_factor ** attempt
-        #         print(f"@@@{FLAGS.llm_model}: An error occurred: {e}. Retrying in {wait_time} seconds...")
-        #         time.sleep(wait_time)
-        
-        # # If we reach here, no response after retries
-        # raise RuntimeError("Failed to get a response after all retries using the new method.")
-        raise ValueError("ADLR not supported")
+        raise RuntimeError("Failed to get a response after all retries using the configured direct LLM gateway.")
     
     else:
         # Using the original legacy method
@@ -359,136 +327,76 @@ def initiate_chat_with_retry(agent_user, agent_coding, message=None, retries=FLA
             **kwargs
         )
 
-def call_Mark_llm(system_prompt: str, user_prompt: str, temperature: float = None, timeout=300, model: str = None):
-    assert FLAGS.LLM_gateaway == 'Mark'
-    
-    # Use provided temperature or default from FLAGS
+def call_OpenAI_llm(system_prompt: str, user_prompt: str, temperature: float = None, timeout=300, model: str = None):
+    assert FLAGS.LLM_gateaway == 'openai'
+
     effective_temperature = temperature if temperature is not None else FLAGS.temperature
-    
-    # Use provided model or default from FLAGS
     effective_model = model if model is not None else FLAGS.llm_model
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set.")
 
-    config_path = os.path.join(os.path.dirname(__file__), "OAI_CONFIG", "OAI_CONFIG_LIST_DAR")
-    with open(config_path, 'r') as f:
-        config_data = json.load(f)
-        # config_data is a list, we need to extract the first config
-        base_config = config_data[0] if isinstance(config_data, list) else config_data
-    
-    if effective_model == 'gpt-4o-20241120':
-        model = 'gpt-4o'
-    elif effective_model == 'claude-3-7-sonnet-20250219':
-        model = 'claude-3-7-sonnet-20250219'
-    elif effective_model == 'o1-20241217':
-        model = 'o1'
-    else:
-        model = effective_model
-    
-    # Create config_list by updating the base_config with the correct model
-    config = copy.deepcopy(base_config)
-    config["model"] = model
-    config["api_key"] = ""  # Ensure api_key is empty string
-    if "gateway_chat_type" not in config:
-        config["gateway_chat_type"] = "dar_mark_team"
-    
-    config_list = [config]
+    client = OpenAI(api_key=api_key, timeout=timeout)
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": user_prompt})
 
-    # Build llm_config - exclude temperature for o-series models
-    llm_config = {
-        "config_list": config_list, 
-        "timeout": timeout,
-        "cache_seed": None  # Disable caching to prevent corruption
+    create_kwargs = {
+        "model": effective_model,
+        "messages": messages,
     }
     if not is_o_series_model(effective_model):
-        llm_config["temperature"] = effective_temperature
+        create_kwargs["temperature"] = effective_temperature
 
-    # print(f"\n{CYAN}Query:{RESET} {user_prompt[:1000]}")
-    # print("-" * 50)
+    response = client.chat.completions.create(**create_kwargs)
+    return response.choices[0].message.content
 
-    # breakpoint()
-    
-    try:
-        # Create a copy of config_list to avoid modifying the original
-        llm_config_copy = copy.deepcopy(llm_config)
-        # Ensure gateway_chat_type is removed from each config in the list
-        # for config in llm_config_copy.get("config_list", []):
-        #     if isinstance(config, dict) and "gateway_chat_type" in config:
-        #         del config["gateway_chat_type"]
-        
-        gpt = BasicClient(llm_config=llm_config_copy)
-        response = gpt.ask_client(system_prompt+"\n\n"+user_prompt)
-        
-        if FLAGS.debug:
-            print(f"{GREEN}Response:{RESET}", response[:200] if response else 'None')
 
-        # breakpoint()
-        return response
-    except Exception as e:
-        print(f"❌ ERROR: {type(e).__name__}: {str(e)}")
-        raise
+def call_Claude_llm(system_prompt: str, user_prompt: str, temperature: float = None, timeout=300, model: str = None):
+    assert FLAGS.LLM_gateaway == 'claude'
 
-def call_Perflab_llm(system_prompt: str, user_prompt: str, temperature: float = None, timeout=300, model: str = None):
-    assert FLAGS.LLM_gateaway == 'perflab'
-
-    # breakpoint()
-    
-    # Use provided temperature or default from FLAGS
     effective_temperature = temperature if temperature is not None else FLAGS.temperature
-    
-    # Use provided model or default from FLAGS
     effective_model = model if model is not None else FLAGS.llm_model
-    
-    # Load PerfLab configuration using centralized function
-    config_list = load_perflab_config(effective_model)
-    
-    # Create llm_config for BasicClient - exclude temperature for o-series models
-    llm_config = {
-        "config_list": config_list,
-        "timeout": timeout,
-        "cache_seed": None  # Disable caching to prevent corruption
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set.")
+
+    client = anthropic.Anthropic(api_key=api_key, timeout=timeout)
+    create_kwargs = {
+        "model": effective_model,
+        "messages": [{"role": "user", "content": user_prompt}],
+        "max_tokens": getattr(FLAGS, "max_token", 4096),
     }
+    if system_prompt:
+        create_kwargs["system"] = system_prompt
     if not is_o_series_model(effective_model):
-        llm_config["temperature"] = effective_temperature
-    
-    # Remove gateway_chat_type if present in config_list
-    for config in llm_config.get("config_list", []):
-        if "gateway_chat_type" in config:
-            del config["gateway_chat_type"]
-    
-    # Initialize BasicClient (which uses autogen's OpenAIWrapper internally)
-    client = BasicClient(llm_config=llm_config)
-    
-    # DEBUG: Lily0923
-    if FLAGS.debug:
-        print(f"\n{CYAN}Query:{RESET} {user_prompt[:200]}...")
-        print("-" * 50)
-    
-    try:
-        # Create messages list with proper roles
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": user_prompt})
-        
-        # Use BasicClient's create method which handles messages with roles
-        response_content = client.create(messages=messages, is_extract_response=True)
-        
-        if FLAGS.debug:
-            print(f"{GREEN}Response:{RESET} {response_content[:200] if response_content else 'None'}...")
-            print("-" * 50)
-        
-        return response_content
-        
-    except Exception as e:
-        print(f"❌ ERROR: {type(e).__name__}: {str(e)}")
-        raise
+        create_kwargs["temperature"] = effective_temperature
+
+    response = client.messages.create(**create_kwargs)
+    return "".join(
+        block.text for block in response.content if getattr(block, "type", None) == "text"
+    )
 
 @retry(
-    retry=retry_if_exception_type((APITimeoutError, APIError, APIConnectionError, httpx.TimeoutException, httpx.ReadTimeout, InternalServerError)),
+    retry=retry_if_exception_type((
+        APITimeoutError,
+        APIError,
+        APIConnectionError,
+        InternalServerError,
+        anthropic.APITimeoutError,
+        anthropic.APIError,
+        anthropic.APIConnectionError,
+        anthropic.InternalServerError,
+        anthropic.RateLimitError,
+        httpx.TimeoutException,
+        httpx.ReadTimeout,
+    )),
     wait=wait_exponential(multiplier=2, min=3, max=60),
     stop=stop_after_attempt(10),
 )
 def llm_inference(system_prompt: str, user_prompt: str, temperature: float = None, LLM_gateaway: str = None, model: str = None):
-    """Direct LLM inference function for Mark and Perflab gateways."""
+    """Direct LLM inference function for supported prompt-only gateways."""
     if LLM_gateaway is None:
         LLM_gateaway = FLAGS.LLM_gateaway
     
@@ -506,10 +414,10 @@ def llm_inference(system_prompt: str, user_prompt: str, temperature: float = Non
     total_tokens = count_tokens(tokenizer, system_prompt + user_prompt)
 
     try:
-        if LLM_gateaway == 'Mark':
-            response = call_Mark_llm(system_prompt, user_prompt, effective_temperature, model=effective_model)
-        elif LLM_gateaway == 'perflab':
-            response = call_Perflab_llm(system_prompt, user_prompt, effective_temperature, model=effective_model)
+        if LLM_gateaway == 'openai':
+            response = call_OpenAI_llm(system_prompt, user_prompt, effective_temperature, model=effective_model)
+        elif LLM_gateaway == 'claude':
+            response = call_Claude_llm(system_prompt, user_prompt, effective_temperature, model=effective_model)
         else:
             raise ValueError(f"Invalid model source: {LLM_gateaway}")
             
@@ -526,4 +434,3 @@ def llm_inference(system_prompt: str, user_prompt: str, temperature: float = Non
         print(f"⚠️ LLM call failed after {inference_time:.2f}s")
         print(f"   Error: {str(e)[:200]}...")
         raise
-

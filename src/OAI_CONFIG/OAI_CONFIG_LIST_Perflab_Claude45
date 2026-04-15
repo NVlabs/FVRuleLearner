@@ -1,9 +1,0 @@
-[
-    {
-        "model": "claude-sonnet-4-5-20250929",
-        "api_key": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjM5MGNiYjkwLWU5NzktNDQ4MS1iODg1LTMxZDI0NmVhNWNhYyIsInNlY3JldCI6IjFtU0ZSS1UvU25DUUJkeVU2NThXMXp3M2R1d0hGN2lTZm5vaU1WWktLeWM9In0.zkYD49SBlvZAYhYH13NyN6VEZ5Fm7Qp_roYJ6WAyVmE",
-        "base_url": "https://llm-proxy.perflab.nvidia.com",
-        "api_type": "azure",
-        "api_version": "2024-12-01-preview"
-    }
-]

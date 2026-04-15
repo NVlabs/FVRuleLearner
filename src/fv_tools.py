@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # User write this file for different applications
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, TypeVar, Union, Annotated
 import re
@@ -168,12 +183,11 @@ def evaluate_jg(
 
     LLM_response = utils2.parse_code_response(LLM_response)
     file_path = Path(saver.logdir) / f'var_temp.pkl'
-    # file_path = '/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-06-23T14-12-10.703807_pdx-container-xterm-16.nvidia.com_liwan/var_temp.pkl'
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
 
     # with_rtl_design = FLAGS.with_rtl_design
-    with_rtl_design = False  # NL2SVA is False while Design2SVA is True
+    with_rtl_design = False  # Release mainline uses the NL2SVA path.
     # setup temp and save directories
     temp_dir = Path(saver.logdir + "/temp")
     if not os.path.isdir(temp_dir):
@@ -241,13 +255,12 @@ def evaluate_jg_opencore(
         .strip()
         .replace("\n", "")
     )
-    file_path = Path(saver.logdir) / f'var_temp.pkl' # Lily: Need to change the way of saving pkl files
-    # file_path = '/home/scratch.liwan_mobile/repo/fv/hardware-agent-marco/src/logs/inference_2024-06-23T14-12-10.703807_pdx-container-xterm-16.nvidia.com_liwan/var_temp.pkl'
+    file_path = Path(saver.logdir) / f'var_temp.pkl'
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
 
     # with_rtl_design = FLAGS.with_rtl_design
-    with_rtl_design = False  # NL2SVA is False while Design2SVA is True
+    with_rtl_design = False  # Release mainline uses the NL2SVA path.
     # setup temp and save directories
     # temp_dir = Path(saver.logdir + "/temp")
     # if not os.path.isdir(temp_dir):
@@ -399,4 +412,3 @@ def extract_uncovered_lines(feedback):
     
     # Return the list of uncovered entries
     return uncovered_entries
-

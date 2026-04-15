@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
 import sys
 import warnings
@@ -23,10 +38,6 @@ from config import FLAGS
 from saver import saver
 print = saver.log_info
 
-# Import Q-Tree inference if enabled
-# if getattr(FLAGS, 'use_qtree_inference', False):
-#     from qtree_inference import QTreeInferenceEngine, create_inference_engine
-
 class RAGAgent:
     def __init__(self, documents, rag_type, embedding_model='sbert'):
         """
@@ -41,26 +52,13 @@ class RAGAgent:
         # Extract sections for comparison and retrieval
         # self.documents = documents
         
-        # Initialize Q-Tree inference engine if enabled
-        # Note: For retrieval_on_ranking mode, we don't need qtree_engine
-        # Instead, we use qtree_enhanced_retrieval module
         self.qtree_engine = None
-        # if getattr(FLAGS, 'use_qtree_inference', False) and rag_type == "Suggestions":
-        #     try:
-        #         self.qtree_engine = create_inference_engine()
-        #         print(f"Initialized Q-Tree inference engine for {rag_type}")
-        #     except Exception as e:
-        #         print(f"Failed to initialize Q-Tree inference engine: {e}")
-        #         self.qtree_engine = None
 
         # Filter documents based on 'Functionality == 1.0' if needed
         if rag_type == "Suggestions":
             if FLAGS.filter_functionality:
                 documents = [doc for doc in documents if self.check_functionality(doc)]
                 print(f"@@@DEBUG: Length of the filtered documents is @@@ {len(documents)} @@@")
-            
-            if FLAGS.baseline_LFM:
-                documents = [doc for doc in documents if not self.check_functionality(doc)]
             
         documents_storage = sum(sys.getsizeof(doc) for doc in documents)
         documents_storage_mb = documents_storage / (1024 * 1024)  # Convert bytes to MB

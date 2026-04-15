@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # Copyright 2024 NVIDIA CORPORATION & AFFILIATES
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -102,14 +117,6 @@ class Evaluator(object):
     ):
         if "nl2sva" in self.task:
             tcl_file_path = FLAGS.tcl_eval_file_path# TODO: see whether we need to change the tcl file
-        elif self.task == "design2sva":
-            tcl_file_path = FLAGS.tcl_coverage_path
-        # elif self.task == "helpergen":
-        #     tcl_file_path = "tool_scripts/run_jg_helpergen.tcl"
-        # else:
-        #     utils.print_error(f"Task not supported", self.task)
-        #     raise NotImplementedError
-
         # # tcl_file_path = os.path.join(current_file_directory, '..', tcl_file_path)
 
         # tcl_file_path = os.path.abspath(
@@ -714,10 +721,6 @@ class NL2SVAMachineEvaluator(Evaluator):
                         .strip()
                         .replace("\n", "")
                     )
-                    if FLAGS.baseline_finetune and FLAGS.task == "nl2sva_opencore":
-                        # If assertion generation does not end with ";"; then add one 
-                        if not lm_assertion_text.strip().endswith(";"):
-                            lm_assertion_text += ";"
                     lm_assertion_text = utils.extract_assertion_formula(lm_assertion_text)
                     ref_assertion_text = lm_result.ref_solution.strip().replace("\n", "")
                     ref_assertion_text = utils.extract_assertion_formula(ref_assertion_text)
@@ -899,176 +902,3 @@ class NL2SVAMachineEvaluator(Evaluator):
             "functionality": 1.0,
             "func_relaxed": 1.0,
         }
-
-
-"""
-Evaluator for Design2SVA
-Implements a custom:
-    - 'calculate_jg_metric' method that analyzes and reports syntax and funcational correctness specific to Design2SVA
-"""
-
-
-class Design2SVAEvaluator(Evaluator):
-    def __init__(
-        self,
-        llm_output_dir: str,
-        model_name: str,
-        temp_dir: str,
-        save_dir: str,
-        parallel_jobs: int = 8,
-        cleanup_temp_files: bool = True,
-        debug: bool = False,
-    ):
-        super().__init__(
-            task="design2sva",
-            llm_output_dir=llm_output_dir,
-            model_name=model_name,
-            temp_dir=temp_dir,
-            save_dir=save_dir,
-            parallel_jobs=parallel_jobs,
-            cleanup_temp_files=cleanup_temp_files,
-            debug=debug,
-        )
-
-    def run_evaluation(
-        self,
-    ):
-        for exp_name, result_list in self.llm_results:
-            jg_eval_results = self.evaluate_jg(result_list, with_rtl_design=True)
-            jg_eval_results = [asdict(r) for r in jg_eval_results]
-            jg_eval_results = pd.DataFrame(jg_eval_results)
-            jg_eval_results.to_csv(f"{self.save_dir}/{exp_name}_jg.csv", index=False)
-
-            jg_eval_results["unique_task_id"] = jg_eval_results["task_id"].apply(
-                lambda x: x.split("_trial")[0]
-            )
-            final_results = jg_eval_results.copy()
-            final_results.to_csv(f"{self.save_dir}/{exp_name}.csv", index=False)
-        return final_results
-
-    # def calculate_jg_metric(self, jasper_out_str: str) -> Dict[str, float]:
-    #     # Check for syntax error
-    #     coverage_dict = {
-    #         "stimuli_statement": 0.0,
-    #         "stimuli_branch": 0.0,
-    #         "stimuli_functional": 0.0,
-    #         "stimuli_toggle": 0.0,
-    #         "stimuli_expression": 0.0,
-    #         "coi_statement": 0.0,
-    #         "coi_branch": 0.0,
-    #         "coi_functional": 0.0,
-    #         "coi_toggle": 0.0,
-    #         "coi_expression": 0.0,
-    #     }
-    #     # Use regex to find coverage metrics in the format "MODEL|COVERAGE"
-    #     coverage_matches = re.findall(r"(\w+)\|(\d+\.\d+)", jasper_out_str)
-    #     for model, value in coverage_matches:
-    #         key = None
-    #         if model == "statement":
-    #             key = "coi_statement"
-    #         elif model == "branch":
-    #             key = "coi_branch"
-    #         elif model == "functional":
-    #             key = "coi_functional"
-    #         elif model == "toggle":
-    #             key = "coi_toggle"
-    #         elif model == "expression":
-    #             key = "coi_expression"
-    #         if key:
-    #             coverage_dict[key] = float(value) / 100.0
-
-    #     metric = {
-    #             "syntax": 1.0,
-    #             "functionality": 1.0,
-    #             "func_relaxed": 1.0,
-    #             "coverage_stimuli_statement": coverage_dict["stimuli_statement"],
-    #             "coverage_stimuli_branch": coverage_dict["stimuli_branch"],
-    #             "coverage_stimuli_functional": coverage_dict["stimuli_functional"],
-    #             "coverage_stimuli_toggle": coverage_dict["stimuli_toggle"],
-    #             "coverage_stimuli_expression": coverage_dict["stimuli_expression"],
-    #             "coverage_coi_statement": coverage_dict["coi_statement"],
-    #             "coverage_coi_branch": coverage_dict["coi_branch"],
-    #             "coverage_coi_functional": coverage_dict["coi_functional"],
-    #             "coverage_coi_toggle": coverage_dict["coi_toggle"],
-    #             "coverage_coi_expression": coverage_dict["coi_expression"],
-    #         }
-        
-    #     syntax_error_match = re.findall(r"syntax error", jasper_out_str, re.IGNORECASE)
-    #     if syntax_error_match:
-    #         metric["syntax"] = 0.0
-
-    #     # Check for number of assertions proven
-    #     proof_result_match = re.findall(r"\bproofs:[^\n]*", jasper_out_str)
-    #     proof_result_list = proof_result_match[-1].split(":")[-1].strip().split()
-    #     # Count number of "proven" assertions
-    #     functionality_score = float(proof_result_list.count("proven")) / float(len(proof_result_list))
-
-    #     relaxed_functionality_score = (
-    #         float(proof_result_list.count("proven")) + float(proof_result_list.count("undetermined"))
-    #     ) / float(len(proof_result_list))
-
-    #     # if not proof_result_match:
-    #     metric["functionality"] = functionality_score
-    #     metric["func_relaxed"] = relaxed_functionality_score
-
-    #     return metric
-
-
-    def calculate_jg_metric(self, jasper_out_str:str):
-        coverage_dict = {
-            "stimuli_statement": 0.0,
-            "stimuli_branch": 0.0,
-            "stimuli_functional": 0.0,
-            "stimuli_toggle": 0.0,
-            "stimuli_expression": 0.0,
-            "coi_statement": 0.0,
-            "coi_branch": 0.0,
-            "coi_functional": 0.0,
-            "coi_toggle": 0.0,
-            "coi_expression": 0.0,
-        }
-
-        # Extract coverage metrics
-        coverage_matches = re.findall(r"(\w+)\|(\w+)\|(\d+\.\d+)", jasper_out_str)
-        key_map = {
-            ("coi", "statement"): "coi_statement",
-            ("coi", "branch"): "coi_branch",
-            ("coi", "functional"): "coi_functional",
-            ("coi", "toggle"): "coi_toggle",
-            ("coi", "expression"): "coi_expression",
-            ("stimuli", "statement"): "stimuli_statement",
-            ("stimuli", "branch"): "stimuli_branch",
-            ("stimuli", "functional"): "stimuli_functional",
-            ("stimuli", "toggle"): "stimuli_toggle",
-            ("stimuli", "expression"): "stimuli_expression",
-        }
-
-        for category, model, value in coverage_matches:
-            key = key_map.get((category, model))
-            if key:
-                coverage_dict[key] = float(value) / 100.0
-
-        # Initialize metric
-        metric = {
-            "syntax": 1.0,
-            "functionality": 1.0,
-            "func_relaxed": 1.0,
-            **{f"coverage_{k}": v for k, v in coverage_dict.items()}
-        }
-
-        # Check for syntax errors
-        if re.search(r"syntax error", jasper_out_str, re.IGNORECASE):
-            metric["syntax"] = 0.0
-
-        # Check proof results
-        proof_result_match = re.findall(r"\bproofs:[^\n]*", jasper_out_str)
-        if proof_result_match:
-            proof_result_list = proof_result_match[-1].split(":")[-1].strip().split()
-            total_assertions = len(proof_result_list)
-            proven_count = proof_result_list.count("proven")
-            undetermined_count = proof_result_list.count("undetermined")
-            
-            metric["functionality"] = proven_count / total_assertions
-            metric["func_relaxed"] = (proven_count + undetermined_count) / total_assertions
-
-        return metric

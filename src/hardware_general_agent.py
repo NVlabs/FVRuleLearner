@@ -1,5 +1,19 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 from self_learning import self_learn
-from autorater import auto_correct
 from utils_agent import initiate_chat_with_retry
 
 import os
@@ -20,8 +34,6 @@ from autogen.agentchat.contrib.capabilities import transform_messages, transform
 from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistantAgent
 from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
 # from autogen.agentchat.contrib.phi_image_agent import PhiVConversableAgent
-from feature_graph_generation import train_feature_graph
-
 import time
 import tracemalloc
 import openai
@@ -33,9 +45,6 @@ import random
 
 import re
 from FVEval.fv_eval import utils as utils2
-from iterative_assertion_generator import run_assertion_generation
-from mcts_assertion_generation import run_mcts_assertion_generation
-from assert_gen_with_pruner import run_assertion_generation_w_pruner
 from saver import saver
 
 print = saver.log_info
@@ -329,8 +338,7 @@ class HardwareAgent:
                 continue
             self.agents[agent_name].revalidate_llm_config()
 
-    # Mark: start the chat to proxy
-    # Need to input the pure text question after using prompt formatting
+    # Start the chat after prompt formatting has produced the final text input.
     def initiate_chat(self, use_cache: bool = False, cache_seed: int = 43, **kwargs) -> str:
 
         if self.manager is None:
@@ -556,94 +564,72 @@ You need to use the provided tools to analyze the code! You are not good at exec
                             if response is None:
                                 suggestions_list = []
                                 seen_suggestions = set()
-                                if FLAGS.baseline_LFM:
+                                if FLAGS.RAG_content == ['Suggestions']:
                                     message = kwargs.get('message')
-                                    response = initiate_chat_with_retry(
-                                        self.agents["user"],
-                                        self.agents["Coding"],
-                                        message=message
-                                    )
-                                    message = (
-                                        "Please analyze the differences between [Your First Answer] and [Reference Answer] and use the analysis to answer the last question\n"                                 
-                                        + "\n".join(retrieved_docs)
-                                        + "Check whether the following a needs revision."
-                                        + f"{message}\n\n"
-                                        + f"[Your First Answer]:{response}\n"
-                                        + f"[Your Second Answer]\n"
-                                        + "Create another answer [Your Second Answer] different from the previous [Your First Answer] using the above analysis."
-                                    )
-                                else:
-                                    if FLAGS.RAG_content == ['Suggestions']:
-                                        message = kwargs.get('message')
-                                    for i, doc in enumerate(retrieved_docs, 1):
-                                        print(f"@@@Full question:{full_question}")
-                                        print(f"@@@Retrieved docs: {i}. {doc}")
-                                        # Remove the "Suggestions:" prefix if it exists
-                                        doc = re.sub(r'^Suggestions:\s*', '', doc.strip())
-                                        
-                                        # Split the document into lines
-                                        if FLAGS.deduplication:
-                                            for suggestion in doc.split('\n'):
-                                                if suggestion not in seen_suggestions:
-                                                    suggestions_list.append(suggestion)
-                                                    seen_suggestions.add(suggestion)
-                                        else:
-                                            suggestions_list += doc.split('\n')
+                                for i, doc in enumerate(retrieved_docs, 1):
+                                    print(f"@@@Full question:{full_question}")
+                                    print(f"@@@Retrieved docs: {i}. {doc}")
+                                    # Remove the "Suggestions:" prefix if it exists
+                                    doc = re.sub(r'^Suggestions:\s*', '', doc.strip())
 
-                                    appended_suggestions = "\n".join(f"{suggestion}" for suggestion in suggestions_list)
-
-                                    # Seeing the appended_suggestions
-                                    # print(f"-----------------------\nappended_suggestions:\n {appended_suggestions}")
-                                    # breakpoint()
-
-                                    if FLAGS.use_RAG:
-                                        if FLAGS.Suggestions_Reasoning:
-                                            suggestions_summary = initiate_chat_with_retry(
-                                                self.agents["user"],
-                                                self.agents["Suggestions_Reasoning"],
-                                                message=(
-                                                    f"{original_message}\n\n"
-                                                    "Task: Select the most relevant suggestions for improving LLM-generated SystemVerilog Assertions.\n\n"
-                                                    "Instructions:\n"
-                                                    "1. Review the suggestions below.\n"
-                                                    "2. Reorder the suggestions, placing the most critical ones at the beginning.\n"
-                                                    "3. Focus on selecting suggestions that directly enhance the functional correctness of assertion generation, particularly addressing error-prone operators that may appear in LLM responses.\n"
-                                                    "4. Provide selected suggestions, each starting with '-'.\n"
-                                                    "5. If none of the suggestions are considered helpful or relevant, return 'None'.\n\n"
-                                                    "Suggestions to consider:\n"
-                                                    f"{chr(10).join(f'{suggestion}' for suggestion in suggestions_list)}\n\n"
-                                                    "Response format: List selected suggestions, each starting with '-', or return 'None' if no suggestions are helpful."
-                                                )
-                                            )
-                                            suggestions_extraction = re.findall(r"^-.*", suggestions_summary, re.MULTILINE)
-                                            post_suggestions_summary = "\n".join(suggestions_extraction)
-                                            # Check if the response indicates no helpful suggestions
-                                            if "none" in suggestions_summary.lower().strip() and not suggestions_extraction:
-                                                appended_suggestions = None
-                                            else:
-                                                appended_suggestions = post_suggestions_summary
-
-                                    # Seeing the appended_suggestions
-                                    # print(f"-----------------------\nExtracted suggestions:\n {appended_suggestions}")
-
-                                    # Track that suggestions were used if appended_suggestions is not empty
-                                    if appended_suggestions and appended_suggestions.strip():
-                                        self.used_suggestions = True
-                                        # Record to saver.stats for later analysis
-                                        saver.save_stats('used_suggestions', 1)
-                                        message = (
-                                            f"{message}\n\n"
-                                            "Additional knowledge/suggestions to follow/obey:\n" 
-                                            + appended_suggestions
-                                        )
-                                        
-                                        # Add operator explanations if available and enabled
-                                        if FLAGS.operator_explanation and operator_explanations:
-                                            message += "\n\nAdditional background information about operators:\n"
-                                            for operator, explanation in operator_explanations.items():
-                                                message += f"Operator: {operator}\nExplanation: {explanation}\n\n"
+                                    # Split the document into lines
+                                    if FLAGS.deduplication:
+                                        for suggestion in doc.split('\n'):
+                                            if suggestion not in seen_suggestions:
+                                                suggestions_list.append(suggestion)
+                                                seen_suggestions.add(suggestion)
                                     else:
-                                        saver.save_stats('used_suggestions', 0)
+                                        suggestions_list += doc.split('\n')
+
+                                appended_suggestions = "\n".join(f"{suggestion}" for suggestion in suggestions_list)
+
+                                # Seeing the appended_suggestions
+                                # print(f"-----------------------\nappended_suggestions:\n {appended_suggestions}")
+                                # breakpoint()
+
+                                if FLAGS.use_RAG and FLAGS.Suggestions_Reasoning:
+                                    suggestions_summary = initiate_chat_with_retry(
+                                        self.agents["user"],
+                                        self.agents["Suggestions_Reasoning"],
+                                        message=(
+                                            f"{original_message}\n\n"
+                                            "Task: Select the most relevant suggestions for improving LLM-generated SystemVerilog Assertions.\n\n"
+                                            "Instructions:\n"
+                                            "1. Review the suggestions below.\n"
+                                            "2. Reorder the suggestions, placing the most critical ones at the beginning.\n"
+                                            "3. Focus on selecting suggestions that directly enhance the functional correctness of assertion generation, particularly addressing error-prone operators that may appear in LLM responses.\n"
+                                            "4. Provide selected suggestions, each starting with '-'.\n"
+                                            "5. If none of the suggestions are considered helpful or relevant, return 'None'.\n\n"
+                                            "Suggestions to consider:\n"
+                                            f"{chr(10).join(f'{suggestion}' for suggestion in suggestions_list)}\n\n"
+                                            "Response format: List selected suggestions, each starting with '-', or return 'None' if no suggestions are helpful."
+                                        )
+                                    )
+                                    suggestions_extraction = re.findall(r"^-.*", suggestions_summary, re.MULTILINE)
+                                    post_suggestions_summary = "\n".join(suggestions_extraction)
+                                    if "none" in suggestions_summary.lower().strip() and not suggestions_extraction:
+                                        appended_suggestions = None
+                                    else:
+                                        appended_suggestions = post_suggestions_summary
+
+                                # Seeing the appended_suggestions
+                                # print(f"-----------------------\nExtracted suggestions:\n {appended_suggestions}")
+
+                                if appended_suggestions and appended_suggestions.strip():
+                                    self.used_suggestions = True
+                                    saver.save_stats('used_suggestions', 1)
+                                    message = (
+                                        f"{message}\n\n"
+                                        "Additional knowledge/suggestions to follow/obey:\n"
+                                        + appended_suggestions
+                                    )
+
+                                    if FLAGS.operator_explanation and operator_explanations:
+                                        message += "\n\nAdditional background information about operators:\n"
+                                        for operator, explanation in operator_explanations.items():
+                                            message += f"Operator: {operator}\nExplanation: {explanation}\n\n"
+                                else:
+                                    saver.save_stats('used_suggestions', 0)
 
                                 # breakpoint()
                                 # Case 1: Have suggestions - Second LLM call guided by suggestions
@@ -810,9 +796,6 @@ You need to use the provided tools to analyze the code! You are not good at exec
                         # if FLAGS.debug:
                         #     print(f"@@@response: {response}")
 
-
-                    if FLAGS.global_task == 'inference' and FLAGS.use_autorater:
-                        response = auto_correct(self.agents, response, kwargs.get('row'))
 
                     if FLAGS.use_JG and FLAGS.global_task == 'inference':
                         num_syntax_iter = 0
@@ -1014,19 +997,6 @@ You need to use the provided tools to analyze the code! You are not good at exec
                             self_learn(self.agents, response, original_message, kwargs.get('row'))
                     # , cache)
                     return response
-
-                elif "design2sva" in FLAGS.task:
-                    if FLAGS.global_task == 'inference':
-                        if FLAGS.iterative_optimization:
-                            response = run_assertion_generation(self.agents, kwargs.get('message'), kwargs.get('row'))
-                        elif FLAGS.use_MCTS:
-                            response = run_mcts_assertion_generation(self.agents, kwargs.get('message'), kwargs.get('row'))
-                        elif FLAGS.use_multi_and_pruner:
-                            response = run_assertion_generation_w_pruner(self.agents, kwargs.get('message'), kwargs.get('row'))
-                    elif FLAGS.global_task == "train":
-                        response = train_feature_graph(self.agents, kwargs.get('message'), kwargs.get('row'))
-                    return response
-                
 
             else:
                 raise NotImplementedError()

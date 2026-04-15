@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # Copyright 2024 NVIDIA CORPORATION & AFFILIATES
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -75,9 +90,6 @@ from pathlib import Path
 #     "eyJraWQiOiI3MjAzZGFhMC1mNDc3LTQ1MjAtYjQ2ZC1lYTY5NjdiZTYyYmUiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJudnNzYS1wcmQtQ2VaLWREbFNGNHVtS01nSm5DcWZHaHBnNFpDOC1HMUxKazRYMWxPOG9mayIsImF1ZCI6WyJudnNzYS1wcmQtQ2VaLWREbFNGNHVtS01nSm5DcWZHaHBnNFpDOC1HMUxKazRYMWxPOG9mayIsInM6NWtiZnhnYXFjM3hnejhuaGlkMXgxcjhjZmVzdG95cG4tdHJvZnV1bS1vYyJdLCJhenAiOiJudnNzYS1wcmQtQ2VaLWREbFNGNHVtS01nSm5DcWZHaHBnNFpDOC1HMUxKazRYMWxPOG9mayIsInNlcnZpY2UiOnsibmFtZSI6ImNoaXBOZU1vIiwiaWQiOiI1NHljanB4cjB1bXRwY2Z3LWN2Zm5ubGl0eHMxbmFqejRrZmk0MW5wdTlxIn0sImlzcyI6Imh0dHBzOi8vNWtiZnhnYXFjM3hnejhuaGlkMXgxcjhjZmVzdG95cG4tdHJvZnV1bS1vYy5zc2EubnZpZGlhLmNvbSIsInNjb3BlcyI6WyJhenVyZW9wZW5haS1yZWFkd3JpdGUiXSwiZXhwIjoxNzE4NzM2MDkzLCJ0b2tlbl90eXBlIjoic2VydmljZV9hY2NvdW50IiwiaWF0IjoxNzE4NzMyNDkzLCJqdGkiOiJlMGUxYzIxNC05MjliLTQzNjgtYTZjNy1lNDk2ZTkwNzU4M2MifQ.XxChwNXTnPvSxXdEEP9OrmAbN4S1Vi7Qy55RhV55ZtgMXNm-JfYF6ZE0dJTtiuUtoGmMsK_fYkBA4TYL0QkOfg"
 # )
 
-# ADLR from Teo
-from adlrchat.langchain import ADLRChat
-
 from langchain.schema import HumanMessage
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
@@ -87,15 +99,9 @@ import pandas as pd
 from tqdm import tqdm
 
 from FVEval.fv_eval import (
-    prompts_design2sva,
     prompts_nl2sva_machine,
     prompts_nl2sva_human,
     utils,
-)
-from FVEval.fv_eval.fv_tool_execution import (
-    eth_rxethmac,
-    ge_1000baseX_rx,
-    omsp_frontend,
 )
 from FVEval.fv_eval.data import InputData, LMResult
 
@@ -768,10 +774,6 @@ class NL2SVALauncher(BenchmarkLauncher):
                     results.append(response)
                 elif self.task == "nl2sva_opencore":
                     post_ref_solution = f"assert property({row.ref_solution});"
-                    # if FLAGS.baseline_finetune and task == "nl2sva_opencore":
-                        # If assertion generation does not end with ";"; then add one 
-                        # if not lm_response.strip().endswith(";"):
-                        #     lm_response += ";"
                     safe_design_name = row.design_name.replace('/', '_')
                     response = LMResult(
                         experiment_id=self.experiment_id,
@@ -900,179 +902,3 @@ class NL2SVAMachineLauncher(NL2SVALauncher):
                 f"unsupported number of in-context examples: {self.num_icl_examples}",
             )
         return user_prompt_prefix
-        return user_prompt_prefix
-
-
-"""
-LLM Inference Launcher Specific to Design2SVA
-"""
-
-
-class Design2SVALauncher(BenchmarkLauncher):
-    def __init__(
-        self,
-        save_dir: str,
-        dataset_path: str,
-        task: str = FLAGS.task,
-        model_name_list: list[str] = ["gpt-4"],
-        debug: bool = False,
-        FVProcessor=None,
-    ):
-        super().__init__(
-            save_dir, dataset_path, task, model_name_list, 0, debug, FVProcessor
-        )
-
-    def generate_system_prompt(self):
-        return prompts_design2sva.SVAGEN_HEADER
-
-    def generate_user_prompt_prefix(self, row: InputData):
-        testbench_text = row.testbench
-        testbench_text = testbench_text.split("assign tb_reset")[0]
-        if FLAGS.task == "design2sva_fsm" or FLAGS.task == "design2sva_pipeline":
-            testbench_text += "assign tb_reset = (reset_ == 1'b0);\n"
-        elif FLAGS.task == "design2sva_training_docs":
-            testbench_text += "assign tb_reset = (rst == 1'b0);\n"
-
-        if row.task_id == "eth_rxethmac":
-            row.prompt = eth_rxethmac
-        elif row.task_id == "ge_1000baseX_rx":
-            row.prompt = ge_1000baseX_rx
-        elif row.task_id == "omsp_frontend":
-            row.prompt = omsp_frontend
-        user_prompt_prefix = prompts_design2sva.SVAGEN_DUT_PREAMBLE
-        user_prompt_prefix += row.prompt
-        user_prompt_prefix += "\n\n" + prompts_design2sva.SVAGEN_TB_PREAMBLE
-        user_prompt_prefix += "\n" + testbench_text
-        return user_prompt_prefix
-
-    def package_testbench(self, row: InputData, lm_response: str):
-        testbench_text_prefix = row.testbench
-        testbench_text_prefix = testbench_text_prefix.split("assign tb_reset")[0]
-        if FLAGS.task == "design2sva_fsm" or FLAGS.task == "design2sva_pipeline":
-            testbench_text_prefix += "assign tb_reset = (reset_ == 1'b0);\n"
-        elif FLAGS.task == "design2sva_training_docs":
-            testbench_text_prefix += "assign tb_reset = (rst == 1'b0);\n"
-        testbench_text_postfix = "endmodule\n" + row.testbench.split("endmodule")[-1]
-        lm_response = utils.parse_code_response(lm_response)
-        packaged_tb_text = (
-            testbench_text_prefix + "\n" + lm_response + "\n" + testbench_text_postfix
-        )
-        return packaged_tb_text
-
-    def get_cot_strategy(self, cot_strategy: str) -> list[tuple[str, str]]:
-        if cot_strategy == "default":
-            return [
-                (
-                    "question",
-                    prompts_design2sva.get_design2sva_direct_question_prompt(FLAGS.num_assertions),
-                )
-            ]
-        elif cot_strategy == "plan-act":
-            return [
-                ("plan", prompts_design2sva.get_design2sva_planning_prompt(FLAGS.num_assertions)),
-                ("question", prompts_design2sva.get_design2sva_question_prompt(FLAGS.num_assertions)),
-            ]
-        elif cot_strategy == "plan-model-act":
-            return [
-                ("plan", prompts_design2sva.get_design2sva_planning_prompt(FLAGS.with_assumptions, FLAGS.num_assertions)),
-                ("model", prompts_design2sva.SVAGEN_MODELING_QUESTION),
-                ("question", prompts_design2sva.get_design2sva_question_prompt(FLAGS.with_assumptions, FLAGS.num_assertions)),
-            ]
-        elif cot_strategy == "plan-model-act-in-one":
-            return [("question", prompts_design2sva.get_design2sva_pma_prompt(FLAGS.with_assumptions, FLAGS.use_inter_param, FLAGS.all_signals_in_one_shot, FLAGS.num_assertions))]
-        else:
-            utils.print_error("ERROR", f"Unsupported COT strategy: {cot_strategy}")
-            raise NotImplementedError
-
-    def run_experiment_single_model(
-        self,
-        model_name: str,
-        temperature: float = 0.0,
-        max_tokens: int = 100,
-        cot_question_chain: list[tuple[str, str]] = [
-            ("question", prompts_design2sva.get_design2sva_direct_question_prompt(1))
-        ],
-        num_cases: int = 1,
-    ):
-        results = []
-        # generate system prompt
-        system_prompt = self.generate_system_prompt()
-
-        # iterate over dataset
-        for row in self._build_iterator(model_name):
-            if self.debug:
-                print(len(self._build_iterator(model_name)))
-            # generate user prompt
-            user_prompt = self.generate_user_prompt_prefix(row)
-            cot_responses = {}
-
-            for i in range(num_cases):
-                # iterate over COT question chain
-                for q_type, q_str in cot_question_chain:
-                    # append question to user prompt
-                    user_prompt += "\n" + q_str
-                    # run LM chain
-
-                    # if FLAGS.agent_arch == "flexible_agents":
-                    #     # Check if the file already exists
-                    #     if file_path.exists():
-                    #         raise FileExistsError(
-                    #             f"The file {file_path} already exists."
-                    #         )
-
-                    # Save the dictionary using pickle
-
-
-                    lm_response_list = self.run_lm_chain(
-                        row=row,
-                        model_name=model_name,
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        num_cases=1,
-                    )
-                    lm_response = lm_response_list[0]
-                    if q_type != cot_question_chain[-1][0]:
-                        cot_responses[q_type] = lm_response
-                        user_prompt += "\n" + lm_response
-
-                data = {
-                    'experiment_id': self.experiment_id,
-                    'task_id': row.design_name + "_" + row.task_id,
-                    'model_name': model_name,
-                    'ref_solution': row.ref_solution,
-                    'user_prompt': user_prompt,
-                    'testbench': row.testbench,
-                    'design_rtl': "\n",
-                    'cot_response': '\n',
-                }
-
-                file_path = Path(saver.logdir) / 'var_temp.pkl'
-                # Save outside
-                # Is user_prompt useful here?
-                with open(file_path, 'wb') as file:
-                    pickle.dump(data, file)
-
-                # stringify cot_responses
-                cot_response = "cot_response\n"
-                for key, value in cot_responses.items():
-                    cot_response += f"{key}: {value}\n"
-
-                # package testbench
-                packaged_tb_text = self.package_testbench(row, lm_response)
-
-                # construct response
-                response = LMResult(
-                    experiment_id=self.experiment_id,
-                    task_id=row.design_name + "_" + row.task_id + f"_trial_{i}",
-                    model_name=model_name,
-                    response=lm_response,
-                    ref_solution=row.ref_solution,
-                    user_prompt=user_prompt,
-                    output_tb=packaged_tb_text,
-                    design_rtl=row.prompt,
-                    cot_response=cot_response,
-                )
-                results.append(response)
-        return results

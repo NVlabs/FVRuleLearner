@@ -1,7 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 from rag_agent import RAGAgent  # Import the RAGAgent class
 # from utils_agent import initiate_chat_with_retry
 
 import os
+import re
 import sys
 from tqdm import tqdm
 import random
@@ -10,30 +26,28 @@ from dataclasses import dataclass
 import pickle
 from dataclasses import asdict
 import time
+from types import SimpleNamespace
 
 # Add the path to the fv_eval directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'fv_eval')))
 # Add the project root directory to sys.path for hardware_agent imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from hardware_general_agent import HardwareAgent
 from hardware_agent.tools_utility import get_tools_descriptions, create_tool_tbl
 from hardware_agent.examples.react_prompt import PREFIX, FORMAT_INSTRUCTIONS, SUFFIX
 
 from langchain_core.prompts import PromptTemplate
 from hardware_agent.examples.fv_question import system_prompt
-from autogen.coding import DockerCommandLineCodeExecutor, LocalCommandLineCodeExecutor
-from autogen import config_list_from_json
 from pprint import pformat
 
-from config import FLAGS, load_perflab_config
+from config import FLAGS
 from saver import saver
+from utils_agent import initiate_chat_with_retry
 
 # import the functions from fv_eval
 # from benchmark_launcher import BenchmarkLauncher
 from FVEval.fv_eval import benchmark_launcher
 
 from FVEval.fv_eval import prompts_svagen_nl2sva as prompts_svagen_nl2sva
-from FVEval.fv_eval import prompts_design2sva as prompts_design2sva
 from FVEval.fv_eval.data import InputData, LMResult
 from FVEval.fv_eval import utils as utils2
 
@@ -42,7 +56,6 @@ from collections import OrderedDict
 from fv_tools import evaluate_jg
 
 from FVEval.fv_eval import (
-    prompts_design2sva,
     prompts_nl2sva_machine,
     prompts_nl2sva_human,
     utils,
@@ -117,7 +130,7 @@ class FVProcessor:
                         df = pd.read_csv(dataset_path)
                         # print(f"@@@DEBUG: CSV has {len(df)} total rows")
                         # print(f"@@@DEBUG: Will load {len(training_IDs)} training rows: {training_IDs[:5]}...")
-                        
+
                         # Load ONLY the specific training row IDs from CSV
                         loaded_count = 0
                         for csv_row_id in training_IDs:
@@ -169,7 +182,12 @@ class FVProcessor:
                         with open(all_suggestions_file, "rb") as pkl_file:
                             documents = pickle.load(pkl_file)
                     else:
-                        raise FileNotFoundError(f"Neither 'suggestions.pkl' nor 'all_suggestions.pkl' found in {FLAGS.load_suggestions_path}")
+                        raise FileNotFoundError(
+                            "Neither 'suggestions.pkl' nor 'all_suggestions.pkl' was found in "
+                            f"{FLAGS.load_suggestions_path}. "
+                            "Set 'load_suggestions_path' in src/config.py to a real training log directory, "
+                            "or export FVRULELEARNER_TRAIN_LOGDIR to override it."
+                        )
                     
                     # print(f'Loaded {len(documents)} suggestions:\n{pformat(documents[:2])}')
                     # elif FLAGS.suggestion_link == "Associated":
@@ -181,19 +199,127 @@ class FVProcessor:
                     assert len(documents) > 0
                     self.suggestion_rag_agent = RAGAgent(documents=documents, rag_type='Suggestions', embedding_model='sbert')
 
+    def _build_lightweight_agents(self):
+        agents = {}
+        for agent_cfg in getattr(self, "agent_configs", []):
+            base_cfg = agent_cfg.get("base_agent_config", {})
+            name = base_cfg.get("name")
+            if not name:
+                continue
+            agents[name] = SimpleNamespace(
+                name=name,
+                system_message=base_cfg.get("system_message", ""),
+                llm_config=base_cfg.get("llm_config", {}),
+                stats={"runtime": [], "tokens": []},
+            )
+        return agents
+
+    def _run_lightweight_nl2sva(self, agents, system_prompt, fv_prompt, row):
+        if "Coding" not in agents or "user" not in agents:
+            raise RuntimeError("Lightweight path requires 'user' and 'Coding' agents.")
+
+        agents["Coding"].system_message = system_prompt
+        message = fv_prompt
+        response = None
+
+        if getattr(FLAGS, "use_RAG", False):
+            full_question = f"Question: Create a SVA assertion that checks: {row.prompt}"
+
+            if (
+                self.example_rag_agent is not None
+                and "Examples" in getattr(FLAGS, "RAG_content", [])
+            ):
+                retrieved_docs = self.example_rag_agent.retrieve(
+                    full_question,
+                    top_k=getattr(FLAGS, "Examples_top_k", 1),
+                )
+                examples_list = [f"- {doc}\n" for doc in retrieved_docs]
+                if getattr(FLAGS, "prompting_instruction", 0) == 0:
+                    message = (
+                        f"{message}\n\n"
+                        "Additional context from similar documents:\n"
+                        + "".join(examples_list)
+                    )
+                elif getattr(FLAGS, "prompting_instruction", 0) == 1:
+                    message = (
+                        f"{message}\n\n"
+                        "Use the following SVA assertion examples to understand the structure and logic of similar assertions. "
+                        "Pay attention to how conditions and logical operators are used to form the assertions. "
+                        "Based on this understanding, generate the requested SVA assertion accurately.\n"
+                        + "".join(examples_list)
+                    )
+
+            if (
+                self.suggestion_rag_agent is not None
+                and "Suggestions" in getattr(FLAGS, "RAG_content", [])
+            ):
+                retrieved_result = self.suggestion_rag_agent.retrieve(
+                    full_question,
+                    top_k=getattr(FLAGS, "Suggestions_top_k", 3),
+                    testbench=row.testbench,
+                )
+
+                operator_explanations = {}
+                initial_sva = None
+                if isinstance(retrieved_result, dict):
+                    retrieved_docs = retrieved_result.get("suggestions", [])
+                    initial_sva = retrieved_result.get("initial_sva")
+                    operator_explanations = retrieved_result.get("operator_explanations", {})
+                else:
+                    retrieved_docs = retrieved_result
+
+                if len(retrieved_docs) == 0 and initial_sva and not getattr(FLAGS, "operator_explanation", False):
+                    saver.save_stats("used_suggestions", 0)
+                    return initial_sva
+
+                suggestions_list = []
+                seen_suggestions = set()
+                for doc in retrieved_docs:
+                    cleaned_doc = re.sub(r"^Suggestions:\s*", "", str(doc).strip())
+                    for suggestion in cleaned_doc.split("\n"):
+                        suggestion = suggestion.strip()
+                        if not suggestion:
+                            continue
+                        if getattr(FLAGS, "deduplication", True):
+                            if suggestion in seen_suggestions:
+                                continue
+                            seen_suggestions.add(suggestion)
+                        suggestions_list.append(suggestion)
+
+                appended_suggestions = "\n".join(suggestions_list)
+                if appended_suggestions:
+                    saver.save_stats("used_suggestions", 1)
+                    message = (
+                        f"{message}\n\n"
+                        "Additional knowledge/suggestions to follow/obey:\n"
+                        f"{appended_suggestions}"
+                    )
+                else:
+                    saver.save_stats("used_suggestions", 0)
+
+                if getattr(FLAGS, "operator_explanation", False) and operator_explanations:
+                    message += "\n\nAdditional background information about operators:\n"
+                    for operator, explanation in operator_explanations.items():
+                        message += f"Operator: {operator}\nExplanation: {explanation}\n"
+
+        if FLAGS.debug:
+            print(f"enriched_prompt=\n{message}")
+
+        response = initiate_chat_with_retry(
+            agents["user"],
+            agents["Coding"],
+            message=message,
+        )
+        return response
+
     def _create_bmark_launcher(self, task):
         # dataset_path for self-learning source files
-        ROOT = Path(__file__).resolve().parents[2]
+        ROOT = Path(__file__).resolve().parents[1]
         dataset_path_for_learning = {
             "nl2sva_human": os.path.join(ROOT, "FVEval", "data_nl2sva", "data", "nl2sva_human.csv"),
             # "nl2sva_machine": os.path.join(ROOT, "FVEval", "data_nl2sva", "data", "nl2sva_machine.csv"),
             "nl2sva_machine": os.path.join(ROOT, "FVEval", "data_nl2sva", "data", "nl2sva_machine_updated.csv"),
             "nl2sva_opencore": os.path.join(ROOT, "FVEval", "data_1k", "module_sva_nl_manual_editing.csv"),
-            "design2sva_fsm": os.path.join(ROOT, "FVEval", "data_design2sva", "data", "design2sva_fsm.csv"),
-            "design2sva_pipeline": os.path.join(ROOT, "FVEval", "data_design2sva", "data", "design2sva_pipeline.csv"),
-            "design2sva_training_docs": os.path.join(ROOT, "FVEval", "data_design2sva", "data", "design2sva_training_docs.csv"),
-            "design2sva_assertionbench": os.path.join(ROOT, "FVEval", "data_design2sva", "data", "design2sva_assertionbench.csv"),
-            # Uncomment or add other datasets as needed
         }
         if task == "nl2sva_human":
             bmark_launcher = benchmark_launcher.NL2SVAHumanLauncher(
@@ -225,15 +351,6 @@ class FVProcessor:
                 debug=FLAGS.debug,
                 FVProcessor=self,
             )
-        elif "design2sva" in FLAGS.task:
-            bmark_launcher = benchmark_launcher.Design2SVALauncher(
-                save_dir=saver.logdir,
-                dataset_path=dataset_path_for_learning.get(task),
-                task=FLAGS.task,
-                model_name_list=[FLAGS.llm_model],
-                debug=FLAGS.debug,
-                FVProcessor=self,
-            )
         else:
             print(f"Unsupported eval mode")
             raise NotImplementedError
@@ -249,35 +366,14 @@ class FVProcessor:
         if FLAGS.agent_arch == "flexible_agents":
             if FLAGS.global_task == 'train':
                 self.add_RAG_reflection_agent(config_list)
-                if "design2sva" in FLAGS.task:
-                    if FLAGS.feature_tree:
-                        self.add_feature_graph_agent(config_list)
-                    if not FLAGS.only_assertion: 
-                        self.add_Assumption_Generation_agent(config_list)
-                    if FLAGS.add_comment:
-                        self.add_comment_agent(config_list)
             else:
                 assert FLAGS.global_task == 'inference'
                 if "nl2sva" in FLAGS.task:
-                    if FLAGS.use_autorater:
-                        self.add_autorater_agent(config_list)
                     if FLAGS.baseline_emsemble and FLAGS.voting_tech == 'LLM':
                         self.add_voting_agent(config_list)
                     if FLAGS.use_RAG and 'Suggestions' in FLAGS.RAG_content:
                         if FLAGS.Suggestions_Reasoning:
                             self.add_Suggestions_Reasoning_agent(config_list)
-                elif "design2sva" in FLAGS.task:
-                    if FLAGS.feature_tree:
-                        self.add_feature_graph_agent(config_list)
-                    if not FLAGS.only_assertion: 
-                        self.add_Assumption_Generation_agent(config_list)
-                    if FLAGS.add_comment:
-                        self.add_comment_agent(config_list)
-                    if FLAGS.use_multi_and_pruner:
-                        self.add_prune_agent(config_list)
-                    if FLAGS.use_ICRL:
-                        self.add_design_meta_agent(config_list)
-                        self.add_ICRL_reasoning_agent(config_list)
 
 
     def add_helper_agents(self, config_list):
@@ -370,54 +466,6 @@ class FVProcessor:
             # }
             )
 
-    def add_autorater_agent(self, config_list):
-        self.agent_configs.append(
-            {
-                'type': 'AssistantAgent',
-                'tools': [],
-                'transform_message': {
-                    'method': [],
-                    'args': [
-                        {'llm_config': {"config_list": config_list, "cache_seed": None}, 'max_token': 1000}
-                    ],
-                },
-                'base_agent_config': {
-                    'name': 'autorater',
-                    'description': 'Assistant who evaluates LLM-generated SystemVerilog Assertions (SVA) based on natural language descriptions, providing numeric ratings and constructive feedback.',
-                    'is_termination_msg': lambda x: x.get("content", "")
-                    and x.get("content", "").rstrip().endswith("TERMINATE"),
-                    'system_message': '''You are an expert SystemVerilog Assertion (SVA) evaluator. Your task is to assess LLM-generated SVAs based on given natural language descriptions. For each evaluation:
-
-        1. Provide a numeric rating from 0 to 10, where 0 is completely incorrect and 10 is perfect.
-        2. Offer concise, constructive feedback based on the following rubric:
-        - Correctness: Does the SVA accurately capture the intended behavior?
-        - Completeness: Does the SVA cover all aspects mentioned in the description?
-        - Syntax: Is the SVA syntactically correct?
-        - Efficiency: Is the assertion written in an optimal and clear manner?
-        - Edge cases: Does the SVA account for potential edge cases?
-
-        3. Highlight any common mistakes, such as:
-        - Misinterpreting temporal operators
-        - Incorrect use of implication
-        - Missing or excessive clock cycles
-        - Overlooking signal sensitivities
-        - Improper handling of reset conditions
-
-        Provide your evaluation in the following format:
-        Rating: [0-10]
-        Feedback: [Your concise feedback here]
-
-        Do not mention specific signal names in your feedback. Focus on general principles and improvements.''',
-                    'llm_config': {
-                        "config_list": config_list,
-                        "cache_seed": None,
-                        "temperature": FLAGS.temperature,
-                        "top_p": 1,
-                    },
-                },
-            }
-        )
-
     def add_voting_agent(self, config_list):
         self.agent_configs.append(
             {
@@ -504,66 +552,6 @@ assert property(@(posedge clk)
             }
         )
     
-    def add_Assumption_Generation_agent(self, config_list):
-        self.agent_configs.append(
-            {
-                'type': 'AssistantAgent',
-                'tools': [],
-                'transform_message': {
-                    'method': ['LLMSummary'],
-                    'args': [{'llm_config': {"config_list": config_list, "cache_seed": None}, 'max_token': FLAGS.max_token}],
-                },
-                'base_agent_config': {
-                    'name': 'Assumption_Generaion',
-                    'description': 'Assistant who reasons the design and generates the assumption properties.',
-                    'is_termination_msg': lambda x: x.get("content", "")
-                    and x.get("content", "").rstrip().endswith("TERMINATE"),
-                    'system_message': prompts_design2sva.ASSUMPGEN_HEADER,
-                    'llm_config': {"config_list": config_list, "[cache]_seed": None, "temperature": FLAGS.temperature, "top_p": 1},
-                },
-            }
-        )
-
-    def add_feature_graph_agent(self, config_list):
-        self.agent_configs.append(
-            {
-                'type': 'AssistantAgent',
-                'tools': [],
-                'transform_message': {
-                    'method': ['LLMSummary'],
-                    'args': [{'llm_config': {"config_list": config_list, "cache_seed": None}, 'max_token': FLAGS.max_token}],
-                },
-                'base_agent_config': {
-                    'name': 'Feature_Graph_Generation',
-                    'description': 'Assistant who reasons the design and generates the feature graph.',
-                    'is_termination_msg': lambda x: x.get("content", "")
-                    and x.get("content", "").rstrip().endswith("TERMINATE"),
-                    'system_message': "You are a formal verification assistant tasked with analyzing the design and generating a detailed feature tree that captures the design’s key features, assumptions, and assertions.",
-                    'llm_config': {"config_list": config_list, "[cache]_seed": None, "temperature": FLAGS.temperature, "top_p": 1},
-                },
-            }
-        )
-
-    def add_comment_agent(self, config_list):
-        self.agent_configs.append(
-            {
-                'type': 'AssistantAgent',
-                'tools': [],
-                'transform_message': {
-                    'method': ['LLMSummary'],
-                    'args': [{'llm_config': {"config_list": config_list, "cache_seed": None}, 'max_token': FLAGS.max_token}],
-                },
-                'base_agent_config': {
-                    'name': 'Comment_Generation',
-                    'description': 'Assistant for commenting on RTL design code. Analyzes key features, signal interactions, and functionality to generate assumptions and assertions.',
-                    'is_termination_msg': lambda x: x.get("content", "")
-                    and x.get("content", "").rstrip().endswith("TERMINATE"),
-                    'system_message': "Provide detailed comments on each line and block of Verilog code, focusing on signal interactions, design features, and functionalities to aid in assumption and assertion generation.",
-                    'llm_config': {"config_list": config_list, "[cache]_seed": None, "temperature": FLAGS.temperature, "top_p": 1},
-                },
-            }
-        )
-
     def add_prune_agent(self, config_list):
         self.agent_configs.append(
             {
@@ -630,45 +618,12 @@ assert property(@(posedge clk)
 
         self.tool_configs = []
 
-        # Load config based on LLM_gateway setting
-        # Use absolute paths relative to this script's location
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        if FLAGS.LLM_gateaway == 'perflab':
-            config_list = load_perflab_config(FLAGS.llm_model, script_dir)
-        elif FLAGS.LLM_gateaway == 'Mark':
-            config_path = os.path.join(script_dir, "OAI_CONFIG/OAI_CONFIG_LIST_DAR")
-            config_list = config_list_from_json(env_or_file=config_path)
-        else:
-            # For the default case, look in parent directory
-            config_path = os.path.join(os.path.dirname(script_dir), "OAI_CONFIG_LIST")
-            config_list = config_list_from_json(env_or_file=config_path)
+        # The release path uses a single OpenAI-compatible model entry.
+        config_list = [{"model": FLAGS.llm_model}]
         assert type(config_list) is list and len(config_list) == 1
         # LLM config list
-        if "ADLR" in FLAGS.LLM_gateaway:
-            # assert FLAGS.llm_model in ["gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "meta/llama3-70b-instruct", "mixtral_8x7b", "gpt-4o"]
-            llm_model = FLAGS.llm_model
-        elif "Mark" in FLAGS.LLM_gateaway:
-            # assert FLAGS.llm_model in ["gpt-3.5-turbo", "gpt-4-turbo", "gpt-4o"]
-            if FLAGS.llm_model == "gpt-3.5-turbo":
-                llm_model = "gpt-35-turbo-16k"
-            elif FLAGS.llm_model == "gpt-4-turbo":
-                llm_model = "gpt4-turbo-2024-04-09"
-            elif FLAGS.llm_model == "gpt-4o":
-                llm_model = "gpt-4o-20241120"
-            else:
-                llm_model = FLAGS.llm_model
-            config_list[0].setdefault("gateway_chat_type", "dar_mark_team")
-        elif "perflab" in FLAGS.LLM_gateaway:
-            llm_model = FLAGS.llm_model
-            if FLAGS.llm_model == "gpt-4o":
-                llm_model = "gpt-4o-20241120"
-            # No need to set gateway_chat_type for Perflab as it uses AzureOpenAI directly
-        elif "original" in FLAGS.LLM_gateaway:
-            llm_model = FLAGS.llm_model
-            config_list[0].setdefault("gateway_chat_type", "original")
-        
-        
+        llm_model = FLAGS.llm_model
+
         config_list[0]['model'] = llm_model
         if FLAGS.llm_model in [
             "mistralai/mixtral-8x22b-instruct-v0.1",
@@ -682,23 +637,10 @@ assert property(@(posedge clk)
 
         os.makedirs("coding", exist_ok=True)
 
-        # Use docker executor for running code in a container if you have docker installed.
-        code_executor = LocalCommandLineCodeExecutor(work_dir="coding")
-
         TASK_TO_HEADER = {
-            "nl2sva_machine": lambda: (prompts_nl2sva_machine.SVAGEN_HEADER_TEXTGRAD 
-                                    if FLAGS.baseline_textgrad 
-                                    else prompts_nl2sva_machine.SVAGEN_HEADER),
-            "nl2sva_opencore": lambda: (prompts_nl2sva_machine.SVAGEN_HEADER_TEXTGRAD 
-                                        if FLAGS.baseline_textgrad 
-                                        else prompts_nl2sva_machine.SVAGEN_HEADER),
-            "nl2sva_human": lambda: (prompts_nl2sva_human.SVAGEN_HEADER_TEXTGRAD 
-                                    if FLAGS.baseline_textgrad 
-                                    else prompts_nl2sva_human.SVAGEN_HEADER),
-            "design2sva_fsm": lambda: prompts_design2sva.SVAGEN_HEADER,
-            "design2sva_pipeline": lambda: prompts_design2sva.SVAGEN_HEADER,
-            "design2sva_training_docs" : lambda: prompts_design2sva.SVAGEN_HEADER,
-            "design2sva_assertionbench" : lambda: prompts_design2sva.SVAGEN_HEADER,
+            "nl2sva_machine": lambda: prompts_nl2sva_machine.SVAGEN_HEADER,
+            "nl2sva_opencore": lambda: prompts_nl2sva_machine.SVAGEN_HEADER,
+            "nl2sva_human": lambda: prompts_nl2sva_human.SVAGEN_HEADER,
         }
 
         # agent configs
@@ -755,6 +697,9 @@ assert property(@(posedge clk)
             #         #   + "\nReply TERMINATE when you have the Final Answer."
             #     )
 
+        if FLAGS.LLM_gateaway in {"openai", "claude"}:
+            self.lightweight_agents = self._build_lightweight_agents()
+
         if FLAGS.global_task == 'inference':
             self._run_benchmark(self.bmark_launcher, FLAGS.task)
 
@@ -771,8 +716,6 @@ assert property(@(posedge clk)
             bmark_launcher.run_benchmark(temperature=FLAGS.temperature, max_tokens=FLAGS.max_token, num_cases=1) # max_tokens = 100 originally
         elif task == "nl2sva_opencore":
             bmark_launcher.run_benchmark(temperature=FLAGS.temperature, max_tokens=FLAGS.max_token, num_cases=1) # max_tokens = 100 originally
-        elif "design2sva" in task:
-            bmark_launcher.run_benchmark(temperature=FLAGS.temperature, max_tokens=FLAGS.max_token, cot_strategy=FLAGS.cot_strategy, num_cases=1) # max_tokens = 2000 originally
         else:
             print(f"Unsupported eval mode")
             raise NotImplementedError
@@ -783,64 +726,33 @@ assert property(@(posedge clk)
         FV_prompt = user_prompt
         # print(f"@@@@FV Prompt: {FV_prompt}")
 
+        if FLAGS.LLM_gateaway in {"openai", "claude"}:
+            agents = getattr(self, "lightweight_agents", None) or self._build_lightweight_agents()
+            self.lightweight_agents = agents
+            lm_response = self._run_lightweight_nl2sva(agents, system_prompt, FV_prompt, row)
+
+            if FLAGS.global_task == "train" and not FLAGS.use_JG:
+                from self_learning import self_learn
+
+                self_learn(agents, lm_response, FV_prompt, row)
+
+            return lm_response
+
+        from hardware_general_agent import HardwareAgent
+
         # Add system prompt
         self.agent_configs[0]['base_agent_config']['system_message'] = system_prompt
         fv_agent = HardwareAgent(
             agent_configs=self.agent_configs,
             tool_configs=self.tool_configs,
-            # group_chat_kwargs=self.group_chat_configs
             example_rag_agent=self.example_rag_agent,
             suggestion_rag_agent=self.suggestion_rag_agent,
         )
 
-        if FLAGS.LLM_gateaway == "perflab" or FLAGS.LLM_gateaway == "Mark":
-            pass
-        else:
+        if FLAGS.LLM_gateaway not in {"openai", "claude"}:
             fv_agent.revalidate_llm_config()
 
-        lm_response = fv_agent.initiate_chat(message=FV_prompt, row=row)
-        
-        return lm_response
-
-    def assumption_prompt(self, row):
-        testbench_text = row.testbench
-        testbench_text = testbench_text.split("assign tb_reset")[0]
-        testbench_text += "assign tb_reset = (reset_ == 1'b0);\n"
-
-        user_prompt_prefix = prompts_design2sva.ASSUMPGEN_DUT_PREAMBLE
-        user_prompt_prefix += row.prompt
-        user_prompt_prefix += "\n\n" + prompts_design2sva.ASSUMPGEN_TB_PREAMBLE
-        user_prompt_prefix += "\n" + testbench_text
-
-        cot_question_chain = self.get_assumption_cot_strategy(FLAGS.cot_strategy)
-
-        for q_type, q_str in cot_question_chain:
-            # append question to user prompt
-            user_prompt_prefix += "\n" + q_str
-        return user_prompt_prefix
-
-    def get_assumption_cot_strategy(self, cot_strategy: str) -> list[tuple[str, str]]:
-        if cot_strategy == "default":
-            return [
-                (
-                    "question",
-                    prompts_design2sva.get_design2sva_assumption_direct_question_prompt(),
-                )
-            ]
-        elif cot_strategy == "plan-act":
-            return [
-                ("plan", prompts_design2sva.get_design2sva_assumption_planning_prompt()),
-                ("question", prompts_design2sva.get_design2sva_assumption_question_prompt()),
-            ]
-        elif cot_strategy == "plan-model-act":
-            return [
-                ("plan", prompts_design2sva.get_design2sva_assumption_planning_prompt()),
-                ("model", prompts_design2sva.ASSUMPGEN_MODELING_QUESTION),
-                ("question", prompts_design2sva.get_design2sva_assumption_question_prompt()),
-            ]
-        else:
-            utils.print_error("ERROR", f"Unsupported COT strategy: {cot_strategy}")
-            raise NotImplementedError
+        return fv_agent.initiate_chat(message=FV_prompt, row=row)
 
 if __name__ == "__main__":
     processor = FVProcessor()

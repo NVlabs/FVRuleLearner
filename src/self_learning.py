@@ -1,23 +1,21 @@
-from textgrad_interface import prompt_self_reflection_textgrad
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 from saver import saver
 import os
-from autogen.agentchat.contrib.capabilities import teachability
-from autogen.cache import Cache
-from autogen.coding import DockerCommandLineCodeExecutor, LocalCommandLineCodeExecutor
-from autogen import (
-    GroupChat,
-    GroupChatManager,
-    AssistantAgent,
-    ConversableAgent,
-    UserProxyAgent,
-    config_list_from_json,
-    register_function,
-)
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, TypeVar, Union
-from autogen.agentchat.contrib.capabilities import transform_messages, transforms
-from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistantAgent
-from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
-# from autogen.agentchat.contrib.phi_image_agent import PhiVConversableAgent
+from typing import Any, Dict
 from utils_agent import initiate_chat_with_retry, is_o_series_model
 
 import re
@@ -232,8 +230,6 @@ def self_learn(agents, response, message, row):
             print(f"@@@Total QTree Time: {total_qtree_time:.2f}s")
             if total_qtree_time > 0:
                  print(f"@@@QA Ratio: {qtree_builder.qa_time / total_qtree_time:.2%}")
-            breakpoint()
-
             # Get aggregated rules from Q-Tree
             rules = qtree_builder.get_aggregated_rules()
             
@@ -485,8 +481,6 @@ def extract_suggestions_2(text):
         return "No suggestions found."
 
 def prompt_self_reflection(user_agent, reflection_agent, row, response, sorted_suggestions=None):
-    if FLAGS.baseline_textgrad:
-        return prompt_self_reflection_textgrad(user_agent, reflection_agent, row, response, sorted_suggestions)
     """
     Prompts the self-reflection agent to compare the generated and reference SVAs and provide suggestions.
 

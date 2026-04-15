@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 from FVEval.run_evaluation import main_eval
 
 from config import FLAGS
@@ -166,82 +181,6 @@ def eval(folder_to_eval):
             default=FLAGS.debug,
         )
 
-    elif "design2sva" in FLAGS.task:
-        parser = argparse.ArgumentParser(
-            description="Run LLM Inference for the FVEval-Design2SVA Benchmark"
-        )
-        parser.add_argument(
-            "--task",
-            type=str,
-            help="task you are evaluating for",
-            default=FLAGS.task,
-        )
-        parser.add_argument(
-            "--llm_output_dir",
-            "-i",
-            type=str,
-            help="path to LLM results dir",
-            default=folder_to_eval,
-        )
-        parser.add_argument(
-            "--model_name",
-            "-m",
-            type=str,
-            help="specific model name to evaluate for",
-            default="",
-        )
-        parser.add_argument(
-            "--dataset_dir",
-            "-d",
-            type=str,
-            help="path to input dataset directory, potentially holding multiple .csv files",
-        )
-        parser.add_argument(
-            "--save_dir",
-            "-o",
-            type=str,
-            help="path to input dataset directory, potentially holding multiple .csv files",
-        )
-        parser.add_argument(
-            "--temp_dir",
-            "-t",
-            type=str,
-            help="path to temp dir",
-        )
-        parser.add_argument(
-            "--temperature",
-            type=float,
-            help="LLM decoder sampling temperature",
-            default=0.0,
-        )
-        parser.add_argument(
-            "--cleanup_temp",
-            type=bool,
-            help="Whether to clean up the temp dir afterwards",
-            default=True,
-        )
-        parser.add_argument(
-            "--nparallel",
-            "-n",
-            type=int,
-            help="parallel JG jobs",
-            default=FLAGS.nparallel,
-        )
-        parser.add_argument(
-            "--cot_strategy",
-            "-c",
-            type=str,
-            help="chain of thought strategy: default, plan-act, plan-model-act",
-            default="default",
-        )
-        parser.add_argument(
-            "--debug",
-            action="store_true",
-            help="debug",
-            default=FLAGS.debug,
-        )
-    
-
     parser.add_argument("--src_examples", type=str, required=False)
     parser.add_argument("--llm_model", type=str, required=False)
     parser.add_argument("--group_id", type=str, required=False)
@@ -256,6 +195,12 @@ def eval(folder_to_eval):
 
 
 def postprocess_csv_files(folder_to_eval):
+    if not os.path.isdir(folder_to_eval):
+        raise FileNotFoundError(
+            f"Eval folder does not exist: {folder_to_eval}. "
+            "Set 'folder_to_eval' in src/config.py to a real inference log directory, "
+            "or export FVRULELEARNER_EVAL_LOGDIR to override it."
+        )
     if "nl2sva" in FLAGS.task:
         jg_file = os.path.join(folder_to_eval, "eval", "*_jg.csv")
         sim_file = os.path.join(folder_to_eval, "eval", "*_sim.csv")
@@ -288,33 +233,3 @@ def postprocess_csv_files(folder_to_eval):
         
         # Analyze suggestion usage if available
         analyze_suggestion_usage_stats(jg_df, folder_to_eval)
-    elif "design2sva" in FLAGS.task:
-        jg_file = os.path.join(folder_to_eval, "eval", "*_jg.csv")
-        jg_df = pd.concat([pd.read_csv(f) for f in glob.glob(jg_file)], ignore_index=True)
-        jg_metrics = [
-            "syntax", 
-            "functionality", 
-            "func_relaxed", 
-            "coverage_stimuli_statement", 
-            "coverage_stimuli_branch", 
-            "coverage_stimuli_functional", 
-            "coverage_stimuli_toggle", 
-            "coverage_stimuli_expression", 
-            "coverage_coi_statement", 
-            "coverage_coi_branch", 
-            "coverage_coi_functional", 
-            "coverage_coi_toggle", 
-            "coverage_coi_expression"
-        ]
-        results = {"mean": {}, "variance": {}}
-        for metric in jg_metrics:
-            results["mean"][metric] = jg_df[metric].mean()
-            results["variance"][metric] = jg_df[metric].var()
-        csv_header = "\t".join(jg_metrics)
-        csv_mean = "\t".join([f"{results['mean'][metric]:.6f}" for metric in jg_metrics])
-        csv_variance = "\t".join([f"{results['variance'][metric]:.6f}" for metric in jg_metrics])
-
-        print("Postprocessing Results:")
-        print(csv_header)
-        print(csv_mean)
-        print(csv_variance)

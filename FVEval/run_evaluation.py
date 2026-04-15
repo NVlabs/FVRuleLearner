@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # Copyright 2024 NVIDIA CORPORATION & AFFILIATES
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,30 +98,8 @@ def main_eval(args):
                 debug=args.debug,
             )
             evaluator.run_evaluation()
-    elif "design2sva" in args.task:
-        evaluator = evaluation.Design2SVAEvaluator(
-            # task = args.task,
-            llm_output_dir=args.llm_output_dir,
-            temp_dir=tmp_dir,
-            save_dir=save_dir,
-            # dataset_path=args.dataset_dir,
-            # task="design2sva",
-            model_name=args.model_name,
-            cleanup_temp_files=args.cleanup_temp,
-            parallel_jobs=args.nparallel,
-            debug=args.debug,
-        )
-        evaluator.run_evaluation()
-    # elif "helpergen" in args.task:
-    #     evaluator = evaluation.HelperGenEvaluator(
-    #         llm_output_dir=args.llm_output_dir,
-    #         temp_dir=tmp_dir,
-    #         save_dir=save_dir,
-    #         cleanup_temp_files=args.cleanup_temp,
-    #         parallel_jobs=args.nparallel,
-    #         debug=args.debug,
-    #     )
-    #     evaluator.run_evaluation()
+    else:
+        raise ValueError(f"Unsupported release task for FVEval/run_evaluation.py: {args.task}")
 
 
 if __name__ == "__main__":
