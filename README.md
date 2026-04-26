@@ -52,8 +52,8 @@ Example:
 export OPENAI_API_KEY=...
 # or: export ANTHROPIC_API_KEY=...
 export PATH=/path/to/jasper/bin:$PATH
-export LM_LICENSE_FILE=5280@cadence.webstore.illinois.edu
-export CDS_LIC_FILE=5280@cadence.webstore.illinois.edu
+export LM_LICENSE_FILE=<your_jasper_license_server>
+export CDS_LIC_FILE=<your_jasper_license_server>
 ```
 
 Run from the repo root:
