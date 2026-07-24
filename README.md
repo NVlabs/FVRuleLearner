@@ -2,17 +2,21 @@
 
 FVRuleLearner is the rule-learning pipeline for `NL2SVA`. The current release mainline is the prompt-only path under `src/`, with JasperGold used for syntax/functionality evaluation.
 
-Paper: https://arxiv.org/abs/2604.03245
+Paper: https://ieeexplore.ieee.org/abstract/document/11563220
 
 BibTeX:
 
 ```bibtex
-@article{wan2026fvrulelearner,
-  title={FVRuleLearner: Operator-Level Reasoning Tree (OP-Tree)-Based Rules Learning for Formal Verification},
+@INPROCEEDINGS{11563220,
   author={Wan, Lily Jiaxin and Ho, Chia-Tung and Bai, Yunsheng and Yu, Cunxi and Chen, Deming and Ren, Haoxing},
-  journal={arXiv preprint arXiv:2604.03245},
-  year={2026}
-}
+  booktitle={2026 IEEE 44th VLSI Test Symposium (VTS)}, 
+  title={FVRuleLearner: Operator-Level Reasoning Tree (Op-Tree)-Based Rules Learning for Formal Verification}, 
+  year={2026},
+  volume={},
+  number={},
+  pages={1-8},
+  keywords={Modeling;Cognition;Cognitive systems;Printing;Large language models;Training;Trees (botanical);Vegetation;Learning (artificial intelligence);Testing;Large Language Models (LLMs);Formal Verification;SystemVerilog Assertions (SVAs)},
+  doi={10.1109/VTS69484.2026.11563220}}
 ```
 
 The supported tasks in this release are:
