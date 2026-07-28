@@ -44,7 +44,7 @@ The supported tasks in this release are:
 
 FVRuleLearner expects:
 
-- either `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, depending on `LLM_gateaway`
+- either `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, depending on `LLM_gateway`
 - `jg` available on `PATH`
 - `LM_LICENSE_FILE` and `CDS_LIC_FILE` for JasperGold
 - optional `FVRULELEARNER_TRAIN_LOGDIR` to override the training log used by inference
@@ -100,11 +100,11 @@ Use these core settings in `src/config.py`:
 global_task = "train"
 task = "nl2sva_opencore"
 
-LLM_gateaway = "openai"
+LLM_gateway = "openai"
 llm_model = "gpt-4o"
 
 # or
-# LLM_gateaway = "claude"
+# LLM_gateway = "claude"
 # llm_model = "claude-sonnet-4-5-20250929"
 ```
 
@@ -140,11 +140,11 @@ Use these core settings in `src/config.py`:
 global_task = "inference"
 task = "nl2sva_opencore"
 
-LLM_gateaway = "openai"
+LLM_gateway = "openai"
 llm_model = "gpt-4o"
 
 # or
-# LLM_gateaway = "claude"
+# LLM_gateway = "claude"
 # llm_model = "claude-sonnet-4-5-20250929"
 
 use_RAG = True
